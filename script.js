@@ -3,52 +3,57 @@ document.addEventListener('DOMContentLoaded', () => {
     const startScreen = document.getElementById('start-screen');
     const gameScreen = document.getElementById('game-screen');
     const resultScreen = document.getElementById('result-screen');
+    const rankingScreen = document.getElementById('ranking-screen');
     
     const startBtn = document.getElementById('start-btn');
     const restartBtn = document.getElementById('restart-btn');
     const viewRankingBtn = document.getElementById('view-ranking-btn');
-    const rankingScreen = document.getElementById('ranking-screen');
     const backToStartBtn = document.getElementById('back-to-start-btn');
     const goHomeBtn = document.getElementById('go-home-btn');
     const resetRankingBtn = document.getElementById('reset-ranking-btn');
     
-    const timeLeftEl = document.getElementById('time-left');
+    const fuelBar = document.getElementById('fuel-bar');
+    const timeLeftText = document.getElementById('time-left-text');
     const scoreEl = document.getElementById('score');
+    const comboDisplay = document.getElementById('combo-display');
     const questionEl = document.getElementById('question');
     const optionBtns = document.querySelectorAll('.option-btn');
     const feedbackEl = document.getElementById('feedback');
     
     const finalScoreEl = document.getElementById('final-score');
     const ratingEl = document.getElementById('rating');
+    const appContainer = document.getElementById('app');
+
+    const rocketPreview = document.getElementById('rocket-preview');
+    const playerRocketEmoji = document.getElementById('player-rocket-emoji');
+    const colorBtns = document.querySelectorAll('.color-btn');
+    const racingTrack = document.getElementById('racing-track');
 
     // Game Variables
     let score = 0;
-    let timeLeft = 20;
+    let combo = 0;
+    let maxTime = 15;
+    let timeLeft = maxTime;
     let timerInterval;
     let currentAnswer = 0;
     let currentQuestionScore = 10;
     let isPlaying = false;
+    let rocketColor = localStorage.getItem('gugudanRocketColor') || 'hue-rotate(0deg)';
     let rankings = JSON.parse(localStorage.getItem('gugudanRankings')) || [];
+    let ghostRocketsData = [];
+
+    // Initialize Customizer
+    initCustomizer();
 
     // Event Listeners
     startBtn.addEventListener('click', startGame);
     restartBtn.addEventListener('click', startGame);
-    
-    viewRankingBtn.addEventListener('click', () => {
-        updateRankingUI();
-        showScreen(rankingScreen);
-    });
-    
-    backToStartBtn.addEventListener('click', () => {
-        showScreen(startScreen);
-    });
-
-    goHomeBtn.addEventListener('click', () => {
-        showScreen(startScreen);
-    });
+    viewRankingBtn.addEventListener('click', () => { updateRankingUI(); showScreen(rankingScreen); });
+    backToStartBtn.addEventListener('click', () => showScreen(startScreen));
+    goHomeBtn.addEventListener('click', () => showScreen(startScreen));
 
     resetRankingBtn.addEventListener('click', () => {
-        if (confirm("정말 랭킹을 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
+        if (confirm("정말 랭킹을 초기화하시겠습니까? (되돌릴 수 없습니다!)")) {
             rankings = [];
             localStorage.removeItem('gugudanRankings');
             updateRankingUI();
@@ -59,26 +64,102 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => handleAnswer(btn));
     });
 
+    // Customizer Logic
+    function initCustomizer() {
+        applyRocketColor(rocketColor);
+        colorBtns.forEach(btn => {
+            if(btn.dataset.color === rocketColor) btn.classList.add('active');
+            btn.addEventListener('click', (e) => {
+                colorBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                rocketColor = btn.dataset.color;
+                applyRocketColor(rocketColor);
+                localStorage.setItem('gugudanRocketColor', rocketColor);
+            });
+        });
+    }
+
+    function applyRocketColor(color) {
+        rocketPreview.style.filter = color;
+        playerRocketEmoji.style.filter = color;
+    }
+
     // Game Functions
     function startGame() {
         score = 0;
-        timeLeft = 20;
+        combo = 0;
+        timeLeft = maxTime;
         isPlaying = true;
         
         updateScore();
-        updateTimer();
+        updateCombo();
+        updateFuel();
+        spawnGhostRockets();
         
         showScreen(gameScreen);
         generateQuestion();
         
         timerInterval = setInterval(() => {
-            timeLeft--;
-            updateTimer();
+            timeLeft -= 0.1; // 100ms interval
+            updateFuel();
             
             if (timeLeft <= 0) {
                 endGame();
             }
-        }, 1000);
+        }, 100);
+    }
+
+    function spawnGhostRockets() {
+        // Clear previous ghosts
+        document.querySelectorAll('.ghost-rocket').forEach(el => el.remove());
+        ghostRocketsData = [];
+        
+        // Use top rankings as ghosts, or dummy if none
+        let targets = rankings.slice(0, 3);
+        if (targets.length === 0) {
+            targets = [
+                { name: '초보 우주인', score: 100 },
+                { name: '베테랑', score: 300 },
+                { name: '우주 괴물', score: 600 }
+            ];
+        }
+
+        targets.forEach((target, i) => {
+            const el = document.createElement('div');
+            el.className = 'ghost-rocket';
+            // Spread them horizontally
+            const leftPos = 20 + (i * 30); // 20%, 50%, 80%
+            el.style.left = `${leftPos}%`;
+            el.innerHTML = `<span>🚀</span><div class="ghost-name">${target.name}</div>`;
+            racingTrack.appendChild(el);
+            
+            ghostRocketsData.push({
+                element: el,
+                targetScore: target.score,
+                initialBottom: 20 + (i * 20) // Initial position higher than player
+            });
+        });
+        updateRacingTrack();
+    }
+
+    function updateRacingTrack() {
+        ghostRocketsData.forEach(ghost => {
+            // Calculate relative position based on score difference
+            // If player score matches ghost score, ghost should be at player level (20%)
+            // If player is lower, ghost is higher.
+            const diff = ghost.targetScore - score;
+            let visualPos = 20;
+            
+            if (diff > 0) {
+                // Ghost is ahead
+                visualPos = 20 + Math.min(60, (diff / 5)); 
+            } else {
+                // Player passed the ghost (ghost falls behind)
+                visualPos = 20 + (diff / 2);
+            }
+            
+            ghost.element.style.bottom = `${Math.max(-20, visualPos)}%`;
+        });
     }
 
     function generateQuestion() {
@@ -89,92 +170,74 @@ document.addEventListener('DOMContentLoaded', () => {
         const num2 = Math.floor(Math.random() * 19) + 2;
         currentAnswer = num1 * num2;
         
-        // Determine question score based on difficulty
-        if (num1 >= 10 && num2 >= 10) {
-            currentQuestionScore = 30; // Hard (both >= 10)
-        } else if (num1 >= 10 || num2 >= 10) {
-            currentQuestionScore = 20; // Medium (one >= 10)
-        } else {
-            currentQuestionScore = 10; // Easy (both < 10)
-        }
+        // Difficulty scoring
+        if (num1 >= 10 && num2 >= 10) currentQuestionScore = 30;
+        else if (num1 >= 10 || num2 >= 10) currentQuestionScore = 20;
+        else currentQuestionScore = 10;
         
         questionEl.textContent = `${num1} × ${num2} = ?`;
         
-        // Generate options
         let options = [currentAnswer];
-        
         while (options.length < 4) {
-            // Generate plausible wrong answers
             let offsetType = Math.floor(Math.random() * 3);
             let wrongAnswer;
+            if (offsetType === 0) wrongAnswer = currentAnswer + (Math.floor(Math.random() * 3) + 1) * num1;
+            else if (offsetType === 1) wrongAnswer = currentAnswer - (Math.floor(Math.random() * 3) + 1) * num2;
+            else wrongAnswer = currentAnswer + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 5) + 1);
             
-            if (offsetType === 0) {
-                wrongAnswer = currentAnswer + (Math.floor(Math.random() * 3) + 1) * num1; // Add multiple of num1
-            } else if (offsetType === 1) {
-                wrongAnswer = currentAnswer - (Math.floor(Math.random() * 3) + 1) * num2; // Subtract multiple of num2
-            } else {
-                wrongAnswer = currentAnswer + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 5) + 1); // Random small offset
-            }
-            
-            // Ensure positive and unique
-            if (wrongAnswer > 0 && !options.includes(wrongAnswer)) {
-                options.push(wrongAnswer);
-            }
+            if (wrongAnswer > 0 && !options.includes(wrongAnswer)) options.push(wrongAnswer);
         }
-        
-        // Shuffle options
         options.sort(() => Math.random() - 0.5);
         
-        // Assign to buttons
         optionBtns.forEach((btn, index) => {
             btn.textContent = options[index];
-            btn.className = 'option-btn'; // Reset classes
+            btn.className = 'option-btn hologram-btn';
             btn.disabled = false;
         });
         
-        // Reset feedback
         feedbackEl.className = 'feedback';
+        feedbackEl.textContent = '';
     }
 
     function handleAnswer(btn) {
         if (!isPlaying) return;
-        
         const selectedAnswer = parseInt(btn.textContent);
-        
-        // Disable all buttons to prevent double clicking
         optionBtns.forEach(b => b.disabled = true);
         
         if (selectedAnswer === currentAnswer) {
-            // Correct answer
-            score += currentQuestionScore;
+            // Correct
+            combo++;
+            const comboMultiplier = 1 + (combo * 0.1);
+            const gainedScore = Math.floor(currentQuestionScore * comboMultiplier);
+            score += gainedScore;
+            
             updateScore();
+            updateCombo();
+            updateRacingTrack();
+            
             btn.classList.add('correct');
-            questionEl.parentElement.classList.add('pop');
-            setTimeout(() => questionEl.parentElement.classList.remove('pop'), 300);
             
-            showFeedback(`정답입니다! 👏 (+${currentQuestionScore}점)`, 'correct');
+            // Visual Effects
+            document.getElementById('player-rocket').classList.add('hyperdrive');
+            setTimeout(() => document.getElementById('player-rocket').classList.remove('hyperdrive'), 300);
             
-            setTimeout(() => {
-                generateQuestion();
-            }, 600);
+            showFeedback(`정답! 👏 +${gainedScore}점`, 'correct');
+            setTimeout(generateQuestion, 400);
         } else {
-            // Wrong answer
-            btn.classList.add('wrong');
-            questionEl.parentElement.classList.add('shake');
-            setTimeout(() => questionEl.parentElement.classList.remove('shake'), 500);
+            // Wrong
+            combo = 0;
+            updateCombo();
             
-            // Highlight correct answer
+            btn.classList.add('wrong');
+            appContainer.classList.add('shake');
+            setTimeout(() => appContainer.classList.remove('shake'), 400);
+            
             optionBtns.forEach(b => {
-                if (parseInt(b.textContent) === currentAnswer) {
-                    b.classList.add('correct');
-                }
+                if (parseInt(b.textContent) === currentAnswer) b.classList.add('correct');
             });
             
-            showFeedback('앗, 틀렸어요! 😢', 'wrong');
-            
-            setTimeout(() => {
-                generateQuestion();
-            }, 1000);
+            showFeedback('오답! 💥 운석 충돌!', 'wrong');
+            setTimeout(generateQuestion, 800);
         }
     }
 
@@ -182,14 +245,29 @@ document.addEventListener('DOMContentLoaded', () => {
         scoreEl.textContent = score;
     }
 
-    function updateTimer() {
-        timeLeftEl.textContent = timeLeft;
-        if (timeLeft <= 10) {
-            timeLeftEl.parentElement.style.backgroundColor = '#ff7675';
-            timeLeftEl.parentElement.style.color = 'white';
+    function updateCombo() {
+        comboDisplay.textContent = `콤보: x${combo}`;
+        if (combo > 1) {
+            comboDisplay.classList.add('pop');
+            setTimeout(() => comboDisplay.classList.remove('pop'), 200);
+            comboDisplay.style.color = '#f1c40f'; // Yellow
         } else {
-            timeLeftEl.parentElement.style.backgroundColor = '#ffeaa7';
-            timeLeftEl.parentElement.style.color = 'var(--primary-color)';
+            comboDisplay.style.color = '#fff';
+        }
+        
+        if(combo >= 5) comboDisplay.style.color = '#e74c3c'; // Red for high combo
+    }
+
+    function updateFuel() {
+        if (timeLeft < 0) timeLeft = 0;
+        timeLeftText.textContent = timeLeft.toFixed(1);
+        const percentage = (timeLeft / maxTime) * 100;
+        fuelBar.style.width = `${percentage}%`;
+        
+        if (percentage <= 20) {
+            fuelBar.style.background = '#e74c3c';
+        } else {
+            fuelBar.style.background = 'linear-gradient(90deg, #f1c40f, #e74c3c)';
         }
     }
 
@@ -204,16 +282,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         finalScoreEl.textContent = score;
         
-        // Determine rating
-        if (score >= 300) {
-            ratingEl.textContent = '구구단 천재! 🥇';
-        } else if (score >= 200) {
-            ratingEl.textContent = '참 잘했어요! 🥈';
-        } else if (score >= 100) {
-            ratingEl.textContent = '조금 더 노력해봐요! 🥉';
-        } else {
-            ratingEl.textContent = '다시 한번 도전해볼까요? 💪';
-        }
+        if (score >= 1000) ratingEl.textContent = '빛의 속도! 전설의 로켓 🚀✨';
+        else if (score >= 500) ratingEl.textContent = '대단해요! 은하계 탐험가 🌌';
+        else if (score >= 200) ratingEl.textContent = '참 잘했어요! 달 착륙 성공 🌕';
+        else ratingEl.textContent = '더 높이 날 수 있어요! 연료 보충 필요 ⛽';
         
         showScreen(resultScreen);
         saveAndShowRanking(score);
@@ -222,15 +294,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function saveAndShowRanking(newScore) {
         if (newScore > 0) {
             setTimeout(() => {
-                let name = prompt("축하합니다! 랭킹에 등록할 이름을 입력하세요:", "플레이어");
+                let name = prompt("우주 여행 종료! 랭킹에 등록할 조종사 이름을 입력하세요:", "파일럿");
                 if (!name || name.trim() === "") name = "익명";
                 
                 rankings.push({ name: name.trim(), score: newScore });
                 rankings.sort((a, b) => b.score - a.score);
-                rankings = rankings.slice(0, 5); // Top 5
+                rankings = rankings.slice(0, 5);
                 localStorage.setItem('gugudanRankings', JSON.stringify(rankings));
                 updateRankingUI();
-            }, 100);
+            }, 500);
         } else {
             updateRankingUI();
         }
@@ -243,9 +315,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const renderList = (element) => {
             if (!element) return;
             element.innerHTML = '';
-            
             if (rankings.length === 0) {
-                element.innerHTML = '<li style="justify-content:center; color:#999;">등록된 랭킹이 없습니다.</li>';
+                element.innerHTML = '<li style="justify-content:center; color:#999;">비행 기록이 없습니다.</li>';
                 return;
             }
 
