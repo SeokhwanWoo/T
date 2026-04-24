@@ -73,9 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Game Variables
     let score = 0;
     let combo = 0;
-    let maxTime = 30; 
+    let maxTime = 60; 
     let timeLeft = maxTime;
-    let maxBossHp = 3000; // Increased HP for clicker game
+    let maxBossHp = 6000; // Increased HP for 1 minute game
     let bossHp = maxBossHp;
     let timerInterval;
     let bossMoveInterval;
@@ -138,8 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
     buyEmpBtn.addEventListener('click', () => buyUpgrade('emp', 500));
 
     // Gameplay Action Listeners
-    bossMonster.addEventListener('click', handleBossClick);
-    battleArena.addEventListener('click', handleArenaClick);
+    bossMonster.addEventListener('pointerdown', handleBossClick);
+    battleArena.addEventListener('pointerdown', handleArenaClick);
 
     function initCustomizer() {
         applyRocketColor(rocketColor);
@@ -261,9 +261,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear old minions
         document.querySelectorAll('.minion').forEach(m => m.remove());
         
-        maxTime = 30 + (upgrades.fuel * 2);
+        maxTime = 60 + (upgrades.fuel * 2);
         timeLeft = maxTime;
-        maxBossHp = 3000;
+        maxBossHp = 6000;
         bossHp = maxBossHp;
         isPlaying = true;
         timeDilationActive = false;
@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
             minion.style.top = `${newTop}%`;
             minion.style.left = `${newLeft}%`;
             
-            minion.addEventListener('click', (e) => {
+            minion.addEventListener('pointerdown', (e) => {
                 e.stopPropagation(); // prevent arena click miss
                 if(!isPlaying) return;
                 

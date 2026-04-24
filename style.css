@@ -25,6 +25,7 @@ body {
     align-items: center;
     min-height: 100vh;
     overflow: hidden;
+    touch-action: none; /* 모바일에서 더블탭 줌, 스크롤, 당겨서 새로고침 방지 */
 }
 
 #space-background { display: none; } /* Replaced by image */
@@ -305,4 +306,21 @@ body.fever-mode {
 @keyframes minionSpawn {
     0% { transform: scale(0); opacity: 0; }
     100% { transform: scale(1); opacity: 1; }
+}
+
+/* Mobile Optimizations */
+@media (max-width: 480px) {
+    .boss-emoji { font-size: 4.5rem; }
+    .ship-emoji { font-size: 3rem; }
+    .boss-shield { font-size: 6rem; }
+    .minion { font-size: 2.5rem; }
+    .small-title { font-size: 0.9rem; }
+    .combo { font-size: 1rem; }
+    .score { font-size: 1rem; }
+    .fuel-label { font-size: 0.9rem; }
+    .btn { font-size: 1.2rem; padding: 0.8rem; }
+    .skill-btn { padding: 0.3rem; }
+    .skill-icon { font-size: 1.2rem; }
+    .skill-name { font-size: 0.8rem; }
+    .enrage-warning { font-size: 2rem; }
 }
