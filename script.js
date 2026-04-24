@@ -62,8 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Assets Manager (Removed for zero-dependency) ---
     // 외부 이미지나 CDN에 의존하지 않고 기본 이모지/도형만 사용하여 에러를 원천 차단합니다.
 
-    // 초기화
-    applyRocketColor(rocketColor);
+    // 초기화 코드는 하단 initCustomizer()에서 안전하게 호출됩니다.
 
     // --- Game State ---
     let gameWidth = window.innerWidth;
