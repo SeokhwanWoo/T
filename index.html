@@ -3,21 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>구구단 마스터 🚀🚀</title>
+    <title>스페이스 레이드 대작전 🚀</title>
     <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="space-background"></div>
-    
     <div id="app">
         <!-- Start Screen -->
         <div id="start-screen" class="screen active">
-            <div class="credits-display hologram-box" style="position: absolute; top: 1rem; right: 1rem; padding: 0.5rem 1rem; font-size: 1.2rem;">
-                💎 크레딧: <span id="total-credits">0</span>
-            </div>
-            <h1 class="neon-text title-glow">스페이스 레이드 🚀🚀</h1>
-            <p class="subtitle">마우스를 클릭해 보스와 쫄병들을 격파하세요!</p>
+            <h1 class="neon-text title-glow">스페이스 레이드 🚀</h1>
+            <p class="subtitle">WASD로 이동하고 적을 처치해 레벨업하세요!</p>
             
             <div class="customizer hologram-box">
                 <h3>내 캐릭터 & 색상 커스터마이징</h3>
@@ -44,173 +39,96 @@
 
             <div style="display: flex; gap: 1rem; flex-direction: column; width: 100%; max-width: 300px; margin: 0 auto;">
                 <button id="start-btn" class="btn primary-btn neon-btn">전투 시작!</button>
-                <button id="shop-btn" class="btn" style="color: #f1c40f; border-color: #f1c40f; background: rgba(0,0,0,0.5); box-shadow: 0 0 10px rgba(241, 196, 15, 0.4), inset 0 0 10px rgba(241, 196, 15, 0.4);">🛒 보급소 (상점)</button>
-                <button id="view-ranking-btn" class="btn secondary-btn neon-btn">🏆 명예의 전당</button>
+                <button id="view-ranking-btn" class="btn secondary-btn neon-btn">명예의 전당</button>
+            </div>
+        </div>
+
+        <!-- Level Up Screen (Overlay) -->
+        <div id="level-up-screen" class="screen" style="z-index: 1000; background: rgba(0,0,0,0.8); display: none;">
+            <h2 class="neon-text" style="font-size: 2.5rem; text-align: center; margin-bottom: 1rem; margin-top: 2rem;">LEVEL UP!</h2>
+            <p style="text-align: center; color: #fff; margin-bottom: 2rem;">보급품을 선택하세요!</p>
+            <div id="upgrade-cards" class="upgrade-cards-container">
+                <!-- Cards generated via JS -->
             </div>
         </div>
 
         <!-- Game Screen -->
         <div id="game-screen" class="screen">
-            <!-- Top HUD -->
+            <!-- Top HUD: EXP and Level -->
             <div class="top-hud">
-                <div class="small-title">스페이스 레이드 🚀🚀</div>
-                <div class="boss-hp-container" id="boss-hp-container" style="display: none;">
-                    <div class="boss-name">알 수 없는 보스 개체</div>
+                <div class="exp-container">
+                    <div class="level-text">Lv. <span id="player-level">1</span></div>
+                    <div class="exp-bar-bg">
+                        <div class="exp-bar-fill" id="exp-bar"></div>
+                    </div>
+                </div>
+                <!-- Boss HP (Hidden by default) -->
+                <div class="boss-hp-container" id="boss-hp-container" style="display: none; margin-top: 0.5rem;">
+                    <div class="boss-name" id="boss-name-text">알 수 없는 보스 개체</div>
                     <div class="hp-bar-bg">
                         <div class="hp-bar-fill" id="boss-hp-bar"></div>
                     </div>
-                    <div class="hp-text"><span id="boss-hp-text">100</span>%</div>
                 </div>
             </div>
             
             <!-- Battle Arena -->
             <div class="battle-arena" id="battle-arena">
-                <div class="player-container">
-                    <span id="player-rocket-emoji" class="ship-emoji">🛸</span>
+                <!-- Player -->
+                <div class="player-container" id="player-container">
+                    <span class="ship-emoji" id="player-rocket-emoji">🛸</span>
                 </div>
-                <div class="laser-beam" id="laser-beam"></div>
-                <div class="boss-container" id="boss-monster">
-                    <span class="boss-emoji">👾</span>
-                    <div id="boss-shield" class="boss-shield" style="display: none;">🛡️</div>
-                </div>
-                <div id="enrage-warning" class="enrage-warning"></div>
+                <!-- Entities will be spawned here by JS -->
             </div>
             
             <!-- Bottom HUD -->
             <div class="bottom-hud">
                 <div class="status-hud">
-                    <div class="fuel-container">
-                        <div class="fuel-label">My Fuel <span id="time-left-text">30.0</span>s</div>
-                        <div class="fuel-bar-bg">
-                            <div id="fuel-bar" class="fuel-bar-fill"></div>
-                        </div>
+                    <div class="score-container" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span style="color: #fff; font-size: 1.2rem;">Score: <span id="score" class="score">0</span></span>
+                        <span style="color: #e74c3c; font-size: 1.2rem;">HP: <span id="player-hp-text">100</span></span>
                     </div>
-                    <div class="combo-score">
-                        <div class="combo" id="combo-display">Combo: x0</div>
-                        <div class="score" style="display: none;">Score: <span id="score">0</span></div>
+                    
+                    <div class="ult-label" style="color: #f1c40f; font-size: 1rem; display: flex; justify-content: space-between;">
+                        <span>Ultimate (Shift)</span>
+                        <span id="ult-ready-text" style="display: none; font-weight: bold; animation: pulse 1s infinite;">READY!</span>
                     </div>
-                </div>
-                
-                <div class="skill-bar">
-                    <button class="skill-btn" id="skill-time" disabled>
-                        <span class="skill-icon">⏳</span>
-                        <span class="skill-name">Time Dilation</span>
-                        <span class="skill-req">3 Combo</span>
-                    </button>
-                    <button class="skill-btn" id="skill-shield" disabled>
-                        <span class="skill-icon">🛡️</span>
-                        <span class="skill-name">Force Field</span>
-                        <span class="skill-req">5 Combo</span>
-                    </button>
-                    <button class="skill-btn" id="skill-emp" disabled>
-                        <span class="skill-icon">💣</span>
-                        <span class="skill-name">EMP 폭탄</span>
-                        <span class="skill-req"><span id="emp-count">0</span> 보유</span>
-                    </button>
+                    <div class="ult-bar-bg" style="width: 100%; height: 12px; background: rgba(255,255,255,0.2); border-radius: 6px; overflow: hidden; border: 1px solid #f1c40f;">
+                        <div class="ult-bar-fill" id="ult-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #f39c12, #f1c40f); transition: width 0.1s linear;"></div>
+                    </div>
                 </div>
             </div>
             
+            <!-- Floating Feedback Overlay -->
             <div id="feedback" class="feedback"></div>
         </div>
 
         <!-- Result Screen -->
         <div id="result-screen" class="screen">
-            <h2 id="result-title" class="neon-text"></h2>
-            <div class="final-score hologram-box">전투 점수: <span id="final-score">0</span>점</div>
-            <div id="rating" class="rating neon-text"></div>
-            
-            <div class="ranking-container hologram-box">
-                <h3 class="neon-text">🏆 전투 랭킹 (Top 5) 🏆</h3>
-                <ul id="ranking-list" class="ranking-list">
-                </ul>
+            <h2 id="result-title" class="neon-text">GAME OVER</h2>
+            <div class="hologram-box">
+                <p>최종 스코어</p>
+                <div class="final-score" id="final-score">0</div>
+                <p id="rating" class="rating">훌륭한 전투였습니다!</p>
             </div>
-
-            <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
-                <button id="restart-btn" class="btn primary-btn neon-btn">다시 도전하기</button>
+            <div style="display: flex; gap: 1rem; flex-direction: column;">
+                <button id="restart-btn" class="btn primary-btn neon-btn">다시 도전</button>
                 <button id="go-home-btn" class="btn secondary-btn neon-btn">처음으로</button>
             </div>
         </div>
 
         <!-- Ranking Screen -->
         <div id="ranking-screen" class="screen">
-            <h2 class="neon-text">🏆 전투 명예의 전당 🏆</h2>
-            <div class="ranking-container hologram-box">
-                <ul id="main-ranking-list" class="ranking-list">
+            <h2 class="neon-text" style="text-align: center; margin-bottom: 1.5rem;">명예의 전당 🏆</h2>
+            <div class="hologram-box" style="flex: 1; overflow-y: auto;">
+                <ul id="ranking-list" class="ranking-list">
+                    <!-- Rankings injected by JS -->
                 </ul>
             </div>
-            <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
-                <button id="back-to-start-btn" class="btn primary-btn neon-btn">처음으로 돌아가기</button>
-                <button id="reset-ranking-btn" class="btn danger-btn neon-btn">랭킹 초기화</button>
-            </div>
-        </div>
-
-        <!-- Shop Screen -->
-        <div id="shop-screen" class="screen">
-            <h2 class="neon-text" style="color: #f1c40f; text-shadow: 0 0 5px #f1c40f;">🛒 우주 보급소</h2>
-            <div class="credits-display hologram-box" style="font-size: 1.5rem; margin-bottom: 1rem; color: #f1c40f;">
-                보유 크레딧: 💎 <span id="shop-credits">0</span>
-            </div>
-            
-            <div class="upgrades-container hologram-box" style="flex: 1; overflow-y: auto;">
-                <div class="upgrade-item">
-                    <div class="upgrade-info">
-                        <div class="upgrade-name">🚀 추가 연료 탱크</div>
-                        <div class="upgrade-desc">기본 타이머를 2초 증가시킵니다.</div>
-                        <div class="upgrade-level">Lv. <span id="upg-fuel-level">0</span></div>
-                    </div>
-                    <button class="btn upgrade-btn" id="buy-fuel-btn">
-                        💎 <span id="upg-fuel-cost">1000</span>
-                    </button>
-                </div>
-                
-                <div class="upgrade-item">
-                    <div class="upgrade-info">
-                        <div class="upgrade-name">💥 빔 출력 강화</div>
-                        <div class="upgrade-desc">정답 시 기본 대미지가 20% 증가합니다.</div>
-                        <div class="upgrade-level">Lv. <span id="upg-dmg-level">0</span></div>
-                    </div>
-                    <button class="btn upgrade-btn" id="buy-dmg-btn">
-                        💎 <span id="upg-dmg-cost">1500</span>
-                    </button>
-                </div>
-                
-                <div class="upgrade-item">
-                    <div class="upgrade-info">
-                        <div class="upgrade-name">🔥 피버 증폭기</div>
-                        <div class="upgrade-desc">피버 모드 지속 시간이 2초 늘어납니다.</div>
-                        <div class="upgrade-level">Lv. <span id="upg-fever-level">0</span></div>
-                    </div>
-                    <button class="btn upgrade-btn" id="buy-fever-btn">
-                        💎 <span id="upg-fever-cost">2000</span>
-                    </button>
-                </div>
-                
-                <div class="upgrade-item">
-                    <div class="upgrade-info">
-                        <div class="upgrade-name">🥽 황금 고글 (패시브)</div>
-                        <div class="upgrade-desc">오답 페널티 연료를 50% 경감합니다. (-2s → -1s)</div>
-                        <div class="upgrade-level">상태: <span id="upg-goggles-level">미보유</span></div>
-                    </div>
-                    <button class="btn upgrade-btn" id="buy-goggles-btn">
-                        💎 <span id="upg-goggles-cost">3000</span>
-                    </button>
-                </div>
-
-                <div class="upgrade-item">
-                    <div class="upgrade-info">
-                        <div class="upgrade-name">💣 EMP 폭탄</div>
-                        <div class="upgrade-desc">방어막 파괴 및 5초 시간 정지. (1회용 소비)</div>
-                        <div class="upgrade-level">보유: <span id="upg-emp-count">0</span>개</div>
-                    </div>
-                    <button class="btn upgrade-btn" id="buy-emp-btn">
-                        💎 <span id="upg-emp-cost">500</span>
-                    </button>
-                </div>
-            </div>
-
-            <button id="shop-back-btn" class="btn primary-btn neon-btn" style="margin-top: 1rem;">메인으로 돌아가기</button>
+            <button id="reset-ranking-btn" class="btn danger-btn neon-btn" style="margin-bottom: 1rem;">기록 초기화</button>
+            <button id="back-to-start-btn" class="btn secondary-btn neon-btn">돌아가기</button>
         </div>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>
