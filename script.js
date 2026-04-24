@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('keydown', (e) => {
         if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
-        if (e.key === 'Shift') checkUltimate();
+        // Shift key ultimate removed (Auto now)
     });
     window.addEventListener('keyup', (e) => {
         if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
@@ -593,30 +593,58 @@ document.addEventListener('DOMContentLoaded', () => {
         if (player.ultGauge >= 100) return;
         player.ultGauge = Math.min(100, player.ultGauge + amount);
         updateHUD();
+        
+        if (player.ultGauge >= 100 && isPlaying && !isPaused) {
+            checkUltimate();
+        }
     }
 
     function checkUltimate() {
-        if (player.ultGauge >= 100 && isPlaying && !isPaused) {
-            player.ultGauge = 0;
-            updateHUD();
-            playSound('ult');
-            appContainer.classList.add('shake-heavy');
-            
-            const allTargets = bossActive ? [...enemies, currentBoss] : [...enemies];
-            allTargets.forEach(t => {
-                const beam = document.createElement('div');
-                beam.className = 'ult-laser';
-                beam.style.left = `${t.x}%`;
-                beam.style.top = `${t.y}%`;
-                battleArena.appendChild(beam);
-                setTimeout(() => beam.remove(), 500);
-            });
+        player.ultGauge = 0;
+        updateHUD();
+        playSound('ult');
+        
+        // Massive Camera Shake
+        appContainer.classList.add('shake-heavy');
+        setTimeout(() => appContainer.classList.remove('shake-heavy'), 1000);
+        
+        // Screen Flash
+        const flash = document.createElement('div');
+        flash.className = 'screen-flash';
+        gameScreen.appendChild(flash);
+        setTimeout(() => flash.remove(), 500);
 
-            enemies.forEach((e, i) => damageEnemy(i, player.damage * 5, e.x, e.y));
-            if (bossActive && currentBoss) damageBoss(player.damage * 5, currentBoss.x, currentBoss.y);
+        const allTargets = bossActive ? [...enemies, currentBoss] : [...enemies];
+        allTargets.forEach(t => {
+            // Massive Explosion Visual
+            const exp = document.createElement('div');
+            exp.className = 'massive-explosion';
+            exp.style.left = `${t.x}%`;
+            exp.style.top = `${t.y}%`;
+            battleArena.appendChild(exp);
+            setTimeout(() => exp.remove(), 500);
             
-            showFeedback('OVERLOAD SHIFT!', 'critical');
+            // Giant Laser
+            const beam = document.createElement('div');
+            beam.className = 'ult-laser';
+            beam.style.left = `${t.x}%`;
+            beam.style.top = `${t.y}%`;
+            beam.style.width = '20px'; // Thicker
+            battleArena.appendChild(beam);
+            setTimeout(() => beam.remove(), 500);
+        });
+
+        // Instant Kill all normal enemies
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            damageEnemy(i, 99999, enemies[i].x, enemies[i].y);
         }
+        
+        // Heavy damage to boss
+        if (bossActive && currentBoss) {
+            damageBoss(player.damage * 20, currentBoss.x, currentBoss.y);
+        }
+        
+        showFeedback('OVERLOAD EXPLOSION!', 'critical');
     }
 
     // --- In-game Level Up (Temporary buffs for current run) ---
