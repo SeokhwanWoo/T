@@ -131,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let gems = [];
     let drones = [];
     let particles = [];
+    let floatingTexts = [];
     let cinematicEffects = [];
     let asteroids = [];
     let capsules = [];
@@ -331,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear DOM entities
         battleArena.querySelectorAll('.enemy, .boss-enemy, .gem, .bullet, .enemy-bullet, .particle, .floating-dmg, .ult-laser, .drone, .drone-bullet, .massive-explosion').forEach(e => e.remove());
         enemies = []; bullets = []; enemyBullets = []; gems = []; drones = [];
-        asteroids = []; capsules = []; cinematicEffects = []; particles = [];
+        asteroids = []; capsules = []; cinematicEffects = []; particles = []; floatingTexts = [];
         combo = 0; comboTimer = 0; isFever = false; feverTimer = 0;
         enemySpawnTimer = 0;
         
@@ -1423,3 +1424,4 @@ document.addEventListener('DOMContentLoaded', () => {
         screenToShow.classList.add('active');
     }
 });
+window.addEventListener('error', function(e) { alert('Error: ' + e.message + ' at ' + e.filename + ':' + e.lineno); }); 
