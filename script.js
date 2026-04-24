@@ -30,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const rocketPreview = document.getElementById('rocket-preview');
     const playerRocketEmoji = document.getElementById('player-rocket-emoji');
     const bossMonster = document.getElementById('boss-monster');
+    const bossShield = document.getElementById('boss-shield');
+    const enrageWarning = document.getElementById('enrage-warning');
     const laserBeam = document.getElementById('laser-beam');
     const colorBtns = document.querySelectorAll('.color-btn');
 
@@ -38,6 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const skillTime = document.getElementById('skill-time');
     const skillShield = document.getElementById('skill-shield');
+    const skillEmp = document.getElementById('skill-emp');
+    const empCountEl = document.getElementById('emp-count');
 
     // Shop Elements
     const totalCreditsEl = document.getElementById('total-credits');
@@ -54,12 +58,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const upgFeverCost = document.getElementById('upg-fever-cost');
     const buyFeverBtn = document.getElementById('buy-fever-btn');
 
+    const upgGogglesLevel = document.getElementById('upg-goggles-level');
+    const upgGogglesCost = document.getElementById('upg-goggles-cost');
+    const buyGogglesBtn = document.getElementById('buy-goggles-btn');
+
+    const upgEmpCount = document.getElementById('upg-emp-count');
+    const upgEmpCost = document.getElementById('upg-emp-cost');
+    const buyEmpBtn = document.getElementById('buy-emp-btn');
+
     // Game Variables
     let score = 0;
     let combo = 0;
-    let maxTime = 30; // Changed to 30s
+    let maxTime = 30; 
     let timeLeft = maxTime;
-    let maxBossHp = 1500; // Increased Boss HP
+    let maxBossHp = 1500; 
     let bossHp = maxBossHp;
     let timerInterval;
     let currentAnswer = 0;
@@ -69,17 +81,23 @@ document.addEventListener('DOMContentLoaded', () => {
     let shieldActive = false;
     let isFever = false;
     let feverTimer;
+    let isEnraged = false;
+    let isBossShielded = false;
+    let empTimerActive = false;
 
     // Local Storage Data
     let rocketColor = localStorage.getItem('gugudanRocketColor') || 'hue-rotate(0deg)';
     let rankings = JSON.parse(localStorage.getItem('gugudanRankings')) || [];
     let totalCredits = parseInt(localStorage.getItem('gugudanCredits')) || 0;
-    let upgrades = JSON.parse(localStorage.getItem('gugudanUpgrades')) || { fuel: 0, damage: 0, fever: 0 };
+    let upgrades = JSON.parse(localStorage.getItem('gugudanUpgrades')) || { fuel: 0, damage: 0, fever: 0, goggles: false, emp: 0 };
+
+    if (upgrades.goggles === undefined) upgrades.goggles = false;
+    if (upgrades.emp === undefined) upgrades.emp = 0;
 
     // Initialize
     initCustomizer();
     updateShopUI();
-    document.querySelector('.score').style.display = 'block'; // Ensure score is visible
+    document.querySelector('.score').style.display = 'block';
 
     // Event Listeners
     startBtn.addEventListener('click', startGame);
@@ -104,14 +122,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     skillTime.addEventListener('click', activateTimeDilation);
-    skillShield.addEventListener('click', activateShield);
+    skillShield.addEventListener('click', activatePlayerShield);
+    skillEmp.addEventListener('click', activateEmpBomb);
 
     // Shop Event Listeners
     buyFuelBtn.addEventListener('click', () => buyUpgrade('fuel', 1000));
     buyDmgBtn.addEventListener('click', () => buyUpgrade('damage', 1500));
     buyFeverBtn.addEventListener('click', () => buyUpgrade('fever', 2000));
+    buyGogglesBtn.addEventListener('click', () => buyUpgrade('goggles', 3000));
+    buyEmpBtn.addEventListener('click', () => buyUpgrade('emp', 500));
 
-    // Customizer Logic
     function initCustomizer() {
         applyRocketColor(rocketColor);
         colorBtns.forEach(btn => {
@@ -131,7 +151,6 @@ document.addEventListener('DOMContentLoaded', () => {
         playerRocketEmoji.style.filter = `${color} drop-shadow(0 0 10px cyan)`;
     }
 
-    // Shop Logic
     function updateShopUI() {
         totalCreditsEl.textContent = totalCredits;
         shopCreditsEl.textContent = totalCredits;
@@ -150,33 +169,49 @@ document.addEventListener('DOMContentLoaded', () => {
         upgFeverLevel.textContent = upgrades.fever;
         upgFeverCost.textContent = feverCost;
         buyFeverBtn.disabled = totalCredits < feverCost;
+
+        if (upgrades.goggles) {
+            upgGogglesLevel.textContent = "보유중 (최대)";
+            buyGogglesBtn.disabled = true;
+            buyGogglesBtn.innerHTML = "완료";
+        } else {
+            upgGogglesLevel.textContent = "미보유";
+            buyGogglesBtn.disabled = totalCredits < 3000;
+        }
+
+        upgEmpCount.textContent = upgrades.emp;
+        buyEmpBtn.disabled = totalCredits < 500;
         
         localStorage.setItem('gugudanCredits', totalCredits);
         localStorage.setItem('gugudanUpgrades', JSON.stringify(upgrades));
     }
 
     function buyUpgrade(type, baseCost) {
-        let cost;
+        let cost = baseCost;
         if (type === 'fuel') cost = 1000 + (upgrades.fuel * 500);
         else if (type === 'damage') cost = 1500 + (upgrades.damage * 700);
         else if (type === 'fever') cost = 2000 + (upgrades.fever * 1000);
 
         if (totalCredits >= cost) {
             totalCredits -= cost;
-            upgrades[type]++;
+            if (type === 'goggles') upgrades.goggles = true;
+            else upgrades[type]++;
             updateShopUI();
         }
     }
 
-    // Game Functions
     function startGame() {
         score = 0;
         combo = 0;
         isFever = false;
+        isEnraged = false;
+        isBossShielded = false;
+        empTimerActive = false;
         document.body.classList.remove('fever-mode');
+        bossShield.style.display = 'none';
+        enrageWarning.className = 'enrage-warning';
         clearTimeout(feverTimer);
         
-        // Apply Upgrades
         maxTime = 30 + (upgrades.fuel * 2);
         timeLeft = maxTime;
         bossHp = maxBossHp;
@@ -194,29 +229,47 @@ document.addEventListener('DOMContentLoaded', () => {
         generateQuestion();
         
         timerInterval = setInterval(() => {
-            // Time dilation reduces fuel burn rate by half
-            let burnRate = timeDilationActive ? 0.05 : 0.1;
+            if (empTimerActive) return; // EMP stops time completely
+
+            let burnRate = 0.1;
+            if (timeDilationActive) burnRate *= 0.5;
+            if (isEnraged) burnRate *= 1.5;
+
             timeLeft -= burnRate; 
             updateFuel();
             
             if (timeLeft <= 0) {
-                endGame(false); // Lost by timeout
+                endGame(false); 
             }
         }, 100);
     }
 
-    function generateQuestion() {
+    function generateQuestion(isFollowUp = false) {
         if (!isPlaying) return;
 
-        // Generate numbers between 2 and 9
-        const num1 = Math.floor(Math.random() * 8) + 2;
-        const num2 = Math.floor(Math.random() * 8) + 2;
+        let num1, num2;
+        
+        if (isFollowUp) {
+            // Give an easier question to break the shield or do damage if shield was just broken
+            num1 = Math.floor(Math.random() * 8) + 2;
+            num2 = Math.floor(Math.random() * 8) + 2;
+        } else {
+            num1 = Math.floor(Math.random() * 8) + 2;
+            num2 = Math.floor(Math.random() * 8) + 2;
+        }
+        
         currentAnswer = num1 * num2;
         
-        // Difficulty scoring
         if (num1 >= 7 && num2 >= 7) currentQuestionScore = 30;
         else if (num1 >= 7 || num2 >= 7) currentQuestionScore = 20;
         else currentQuestionScore = 10;
+
+        // Boss Shield Logic (Only apply if it's not a follow up and difficulty is hard)
+        if (currentQuestionScore >= 20 && !isFollowUp && !isBossShielded) {
+            isBossShielded = true;
+            bossShield.style.display = 'block';
+            showFeedback('보스 방어막 활성화! 연속 2회 타격 필요!', 'wrong');
+        }
         
         questionEl.textContent = `${num1} × ${num2} = ?`;
         
@@ -248,55 +301,74 @@ document.addEventListener('DOMContentLoaded', () => {
         optionBtns.forEach(b => b.disabled = true);
         
         if (selectedAnswer === currentAnswer) {
-            // Correct
             combo++;
             checkFever();
-            
-            const comboMultiplier = 1 + (combo * 0.1);
-            const upgradeMultiplier = 1 + (upgrades.damage * 0.2);
-            const feverMultiplier = isFever ? 2 : 1;
-            
-            const gainedScore = Math.floor(currentQuestionScore * comboMultiplier * upgradeMultiplier * feverMultiplier);
-            score += gainedScore;
-            bossHp -= gainedScore;
-            
-            updateScore();
-            updateCombo();
-            updateBossHp();
-            updateSkills();
-            
             btn.classList.add('correct');
             
-            // Fire Laser!
-            if(isFever) laserBeam.classList.add('fever-laser');
-            laserBeam.classList.add('laser-fire');
-            
-            setTimeout(() => {
-                bossMonster.classList.add('boss-hit');
-                createParticles(bossMonster);
-            }, 100);
-            
-            setTimeout(() => {
-                laserBeam.classList.remove('laser-fire');
-                bossMonster.classList.remove('boss-hit');
-                laserBeam.classList.remove('fever-laser');
-            }, 300);
-            
-            showFeedback(`명중! 💥 +${gainedScore} 대미지`, 'correct');
-            
-            if (bossHp <= 0) {
-                setTimeout(() => endGame(true), 500); // Win
+            if (isBossShielded) {
+                // Break shield
+                isBossShielded = false;
+                bossShield.style.display = 'none';
+                showFeedback('방어막 파괴! 다음 문제로 대미지를 입히세요!', 'correct');
+                
+                // Fire small laser for effect
+                laserBeam.classList.add('laser-fire');
+                setTimeout(() => { laserBeam.classList.remove('laser-fire'); }, 200);
+
+                setTimeout(() => generateQuestion(true), 400);
             } else {
-                setTimeout(generateQuestion, (isFever ? 200 : 400)); // Faster in fever
+                // Deal Damage
+                const comboMultiplier = 1 + (combo * 0.1);
+                const upgradeMultiplier = 1 + (upgrades.damage * 0.2);
+                const feverMultiplier = isFever ? 2 : 1;
+                
+                const gainedScore = Math.floor(currentQuestionScore * comboMultiplier * upgradeMultiplier * feverMultiplier);
+                score += gainedScore;
+                bossHp -= gainedScore;
+                
+                updateScore();
+                updateCombo();
+                updateBossHp();
+                updateSkills();
+                
+                if (isFever) laserBeam.classList.add('fever-laser');
+                laserBeam.classList.add('laser-fire');
+                
+                setTimeout(() => {
+                    bossMonster.classList.add('boss-hit');
+                    createParticles(bossMonster);
+                    createFloatingText(`+${gainedScore}`, isFever ? 'critical' : '');
+                }, 100);
+                
+                setTimeout(() => {
+                    laserBeam.classList.remove('laser-fire');
+                    bossMonster.classList.remove('boss-hit');
+                    laserBeam.classList.remove('fever-laser');
+                }, 300);
+                
+                showFeedback(`명중! 💥 +${gainedScore} 대미지`, 'correct');
+                checkEnrage();
+                
+                if (bossHp <= 0) {
+                    setTimeout(() => endGame(true), 500); 
+                } else {
+                    setTimeout(() => generateQuestion(false), (isFever ? 200 : 400));
+                }
             }
         } else {
-            // Wrong
+            // Wrong Answer
             combo = 0;
             updateCombo();
             updateSkills();
-            
             btn.classList.add('wrong');
             
+            // If shield was broken, it regenerates
+            if (currentQuestionScore >= 20 && !isBossShielded) {
+                isBossShielded = true;
+                bossShield.style.display = 'block';
+                showFeedback('방어막이 재생성되었습니다!', 'wrong');
+            }
+
             if (shieldActive) {
                 showFeedback('방어막 가동! 피해 무효화 🛡️', 'correct');
                 shieldActive = false;
@@ -304,9 +376,14 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 appContainer.classList.add('shake-heavy');
                 playerRocketEmoji.classList.add('ship-hit');
-                timeLeft -= 2; // Penalty
+                
+                let penalty = 2;
+                if (upgrades.goggles) penalty = 1;
+                
+                timeLeft -= penalty; 
                 updateFuel();
-                showFeedback('피격! 연료 -2초 ⚠️', 'wrong');
+                showFeedback(`피격! 연료 -${penalty}초 ⚠️`, 'wrong');
+                createFloatingText(`-${penalty}s`, 'wrong');
                 
                 setTimeout(() => {
                     appContainer.classList.remove('shake-heavy');
@@ -323,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (parseInt(b.textContent) === currentAnswer) b.classList.add('correct');
             });
             
-            setTimeout(generateQuestion, 800);
+            setTimeout(() => generateQuestion(false), 800);
         }
     }
 
@@ -350,10 +427,40 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function checkEnrage() {
+        if (bossHp <= maxBossHp / 2 && !isEnraged) {
+            isEnraged = true;
+            enrageWarning.textContent = '⚠️ BOSS ENRAGED! ⚠️';
+            enrageWarning.classList.add('show');
+            setTimeout(() => enrageWarning.classList.remove('show'), 2000);
+            showFeedback('광폭화! 연료 소모 속도 증가!', 'wrong');
+        }
+    }
+
+    function createFloatingText(text, type) {
+        const floatEl = document.createElement('div');
+        floatEl.className = `floating-dmg ${type}`;
+        floatEl.textContent = text;
+        
+        const rect = bossMonster.getBoundingClientRect();
+        const appRect = gameScreen.getBoundingClientRect();
+        
+        // Random offset
+        const offsetX = (Math.random() - 0.5) * 50;
+        const offsetY = (Math.random() - 0.5) * 50;
+        
+        floatEl.style.left = `${rect.left - appRect.left + (rect.width/2) + offsetX}px`;
+        floatEl.style.top = `${rect.top - appRect.top + (rect.height/2) + offsetY}px`;
+        
+        gameScreen.appendChild(floatEl);
+        setTimeout(() => floatEl.remove(), 1000);
+    }
+
     function createParticles(targetEl) {
         const rect = targetEl.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
+        const appRect = gameScreen.getBoundingClientRect();
+        const centerX = rect.left - appRect.left + rect.width / 2;
+        const centerY = rect.top - appRect.top + rect.height / 2;
 
         for (let i = 0; i < 15; i++) {
             const particle = document.createElement('div');
@@ -362,15 +469,14 @@ document.addEventListener('DOMContentLoaded', () => {
             
             particle.style.left = `${centerX}px`;
             particle.style.top = `${centerY}px`;
-            document.body.appendChild(particle);
+            gameScreen.appendChild(particle);
             
             const angle = Math.random() * Math.PI * 2;
             const velocity = 50 + Math.random() * 100;
             const tx = Math.cos(angle) * velocity;
             const ty = Math.sin(angle) * velocity;
             
-            // Force reflow
-            particle.getBoundingClientRect();
+            particle.getBoundingClientRect(); // reflow
             
             particle.style.transform = `translate(${tx}px, ${ty}px) scale(0)`;
             particle.style.opacity = '0';
@@ -387,7 +493,6 @@ document.addEventListener('DOMContentLoaded', () => {
             timeDilationActive = true;
             skillTime.classList.add('skill-active');
             showFeedback('시간 지연 가동! ⏳', 'correct');
-            
             setTimeout(() => {
                 timeDilationActive = false;
                 skillTime.classList.remove('skill-active');
@@ -395,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function activateShield() {
+    function activatePlayerShield() {
         if (combo >= 5 && !shieldActive) {
             combo -= 5;
             updateCombo();
@@ -406,9 +511,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function activateEmpBomb() {
+        if (upgrades.emp > 0) {
+            upgrades.emp--;
+            localStorage.setItem('gugudanUpgrades', JSON.stringify(upgrades));
+            updateSkills();
+            
+            // EMP Effects
+            appContainer.classList.add('shake-heavy');
+            document.body.style.filter = 'invert(1)';
+            setTimeout(() => {
+                document.body.style.filter = 'none';
+                appContainer.classList.remove('shake-heavy');
+            }, 200);
+
+            showFeedback('EMP 폭발! 방어막 무효화 및 5초 정지!', 'correct');
+            
+            if (isBossShielded) {
+                isBossShielded = false;
+                bossShield.style.display = 'none';
+            }
+            
+            empTimerActive = true;
+            setTimeout(() => {
+                empTimerActive = false;
+                showFeedback('EMP 효과 종료.', '');
+            }, 5000);
+        }
+    }
+
     function updateSkills() {
         skillTime.disabled = combo < 3 || timeDilationActive;
         skillShield.disabled = combo < 5 || shieldActive;
+        
+        empCountEl.textContent = upgrades.emp;
+        skillEmp.disabled = upgrades.emp <= 0;
     }
 
     function updateScore() {
@@ -426,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             comboDisplay.style.color = '#fff';
         }
-        if(combo >= 10) comboDisplay.style.color = '#ff00ff'; // Fever color
+        if(combo >= 10) comboDisplay.style.color = '#ff00ff';
         else if(combo >= 5) comboDisplay.style.color = '#e74c3c';
     }
 
@@ -458,7 +595,6 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(feverTimer);
         document.body.classList.remove('fever-mode');
         
-        // Add score to credits
         totalCredits += score;
         localStorage.setItem('gugudanCredits', totalCredits);
         

@@ -60,7 +60,9 @@
                 <div class="laser-beam" id="laser-beam"></div>
                 <div class="boss-container" id="boss-monster">
                     <span class="boss-emoji">👾</span>
+                    <div id="boss-shield" class="boss-shield" style="display: none;">🛡️</div>
                 </div>
+                <div id="enrage-warning" class="enrage-warning"></div>
             </div>
             
             <!-- Bottom HUD -->
@@ -99,6 +101,11 @@
                         <span class="skill-icon">🛡️</span>
                         <span class="skill-name">Force Field</span>
                         <span class="skill-req">5 Combo</span>
+                    </button>
+                    <button class="skill-btn" id="skill-emp" disabled>
+                        <span class="skill-icon">💣</span>
+                        <span class="skill-name">EMP 폭탄</span>
+                        <span class="skill-req"><span id="emp-count">0</span> 보유</span>
                     </button>
                 </div>
             </div>
@@ -175,6 +182,28 @@
                     </div>
                     <button class="btn upgrade-btn" id="buy-fever-btn">
                         💎 <span id="upg-fever-cost">2000</span>
+                    </button>
+                </div>
+                
+                <div class="upgrade-item">
+                    <div class="upgrade-info">
+                        <div class="upgrade-name">🥽 황금 고글 (패시브)</div>
+                        <div class="upgrade-desc">오답 페널티 연료를 50% 경감합니다. (-2s → -1s)</div>
+                        <div class="upgrade-level">상태: <span id="upg-goggles-level">미보유</span></div>
+                    </div>
+                    <button class="btn upgrade-btn" id="buy-goggles-btn">
+                        💎 <span id="upg-goggles-cost">3000</span>
+                    </button>
+                </div>
+
+                <div class="upgrade-item">
+                    <div class="upgrade-info">
+                        <div class="upgrade-name">💣 EMP 폭탄</div>
+                        <div class="upgrade-desc">방어막 파괴 및 5초 시간 정지. (1회용 소비)</div>
+                        <div class="upgrade-level">보유: <span id="upg-emp-count">0</span>개</div>
+                    </div>
+                    <button class="btn upgrade-btn" id="buy-emp-btn">
+                        💎 <span id="upg-emp-cost">500</span>
                     </button>
                 </div>
             </div>

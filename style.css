@@ -106,6 +106,39 @@ body {
 .ship-emoji { font-size: 4rem; filter: hue-rotate(0deg) drop-shadow(0 0 10px cyan); display: block; }
 .boss-emoji { font-size: 6rem; filter: drop-shadow(0 0 20px #e74c3c); display: block; transition: transform 0.1s, filter 0.1s; }
 
+.boss-shield {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 8rem; opacity: 0.6; pointer-events: none;
+    filter: drop-shadow(0 0 20px cyan); animation: pulseShield 1s infinite alternate;
+}
+@keyframes pulseShield { 0% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.9); } 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.1); } }
+
+.enrage-warning {
+    position: absolute; top: 20%; left: 50%; transform: translateX(-50%);
+    font-size: 3rem; color: #e74c3c; font-weight: bold; text-shadow: 0 0 20px #e74c3c, 0 0 40px #fff;
+    opacity: 0; pointer-events: none; z-index: 200; text-align: center; white-space: nowrap;
+}
+.enrage-warning.show { animation: warningFlash 2s ease-out forwards; }
+@keyframes warningFlash {
+    0% { opacity: 0; transform: translate(-50%, -20px) scale(0.5); }
+    10%, 30%, 50%, 70% { opacity: 1; color: #fff; text-shadow: 0 0 30px #e74c3c; }
+    20%, 40%, 60%, 80% { opacity: 1; color: #e74c3c; text-shadow: 0 0 10px #fff; }
+    100% { opacity: 0; transform: translate(-50%, 0) scale(1.5); }
+}
+
+.floating-dmg {
+    position: absolute; color: #f1c40f; font-weight: bold; font-size: 2rem;
+    text-shadow: 0 0 10px #f1c40f, 0 0 5px #000;
+    pointer-events: none; z-index: 100;
+    animation: floatUp 1s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+.floating-dmg.critical { color: #ff00ff; text-shadow: 0 0 10px #ff00ff, 0 0 5px #000; font-size: 3rem; }
+@keyframes floatUp {
+    0% { opacity: 1; transform: translateY(0) scale(0.5); }
+    50% { transform: translateY(-50px) scale(1.2); }
+    100% { opacity: 0; transform: translateY(-100px) scale(1); }
+}
+
 .laser-beam {
     position: absolute; left: 6rem; height: 8px; top: 50%; transform: translateY(-50%);
     background: linear-gradient(90deg, #66fcf1, #f1c40f);
@@ -115,7 +148,14 @@ body {
 }
 .laser-fire { width: calc(100% - 13rem); opacity: 1; }
 
-.boss-hit { transform: translateX(10px) scale(0.95); filter: drop-shadow(0 0 40px #fff) brightness(2) hue-rotate(-50deg); }
+.boss-hit { animation: violentShake 0.3s; filter: drop-shadow(0 0 40px #fff) brightness(2) hue-rotate(-50deg); }
+@keyframes violentShake {
+    0%, 100% { transform: translate(0, 0); }
+    20% { transform: translate(-20px, 10px) rotate(-10deg); }
+    40% { transform: translate(20px, -10px) rotate(10deg); }
+    60% { transform: translate(-10px, -20px) rotate(-5deg); }
+    80% { transform: translate(10px, 20px) rotate(5deg); }
+}
 .ship-hit { transform: translateX(-10px) scale(0.95); filter: drop-shadow(0 0 40px #e74c3c) brightness(0.5); }
 
 /* Bottom HUD */
@@ -192,11 +232,14 @@ body {
 
 /* Fever Mode */
 body.fever-mode {
-    animation: feverBg 2s infinite alternate;
+    animation: feverPsychedelic 1s infinite alternate;
 }
-@keyframes feverBg {
-    0% { filter: hue-rotate(0deg) saturate(1.5); }
-    100% { filter: hue-rotate(90deg) saturate(2); }
+@keyframes feverPsychedelic {
+    0% { filter: hue-rotate(0deg) saturate(2) contrast(1.2); }
+    25% { filter: hue-rotate(90deg) saturate(2.5) contrast(1.5) brightness(1.2); }
+    50% { filter: hue-rotate(180deg) saturate(2) contrast(1.2); }
+    75% { filter: hue-rotate(270deg) saturate(2.5) contrast(1.5) brightness(1.2); }
+    100% { filter: hue-rotate(360deg) saturate(2) contrast(1.2); }
 }
 
 .fever-laser {
