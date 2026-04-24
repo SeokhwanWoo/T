@@ -103,11 +103,19 @@ body {
 .hp-bar-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #c0392b, #ff7675); transition: width 0.3s ease-out; }
 .hp-text { color: white; font-size: 0.9rem; margin-top: 0.2rem; }
 
-/* Battle Arena */
 .battle-arena {
-    flex: 1; position: relative; display: flex; justify-content: space-between; align-items: center; padding: 0 1rem;
+    flex: 1; position: relative; width: 100%; height: 100%; overflow: hidden;
+    cursor: crosshair; /* 십자선 커서로 사격 느낌 추가 */
+}
+.player-container {
+    position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
 }
 .ship-emoji { font-size: 4rem; filter: hue-rotate(0deg) drop-shadow(0 0 10px cyan); display: block; }
+
+.boss-container {
+    position: absolute; right: 2rem; top: 50%; transform: translateY(-50%);
+    cursor: pointer; z-index: 10; transition: top 0.2s, left 0.2s;
+}
 .boss-emoji { font-size: 6rem; filter: drop-shadow(0 0 20px #e74c3c); display: block; transition: transform 0.1s, filter 0.1s; }
 
 .boss-shield {
@@ -163,20 +171,7 @@ body {
 .ship-hit { transform: translateX(-10px) scale(0.95); filter: drop-shadow(0 0 40px #e74c3c) brightness(0.5); }
 
 /* Bottom HUD */
-.bottom-hud { display: flex; flex-direction: column; gap: 0.5rem; }
-
-/* Hologram Board */
-.hologram-board { background: rgba(0, 20, 30, 0.7); border: 2px solid var(--primary-color); border-radius: 15px; padding: 1rem; box-shadow: 0 0 20px rgba(102, 252, 241, 0.2); }
-.question { font-size: 2.5rem; text-align: center; color: var(--primary-color); text-shadow: 0 0 10px var(--primary-color); margin-bottom: 1rem; }
-.options-container { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
-.hologram-btn {
-    font-family: 'Jua', sans-serif; font-size: 1.8rem; background: rgba(102, 252, 241, 0.1); color: var(--text-color);
-    border: 1px solid var(--primary-color); border-radius: 10px; padding: 0.8rem; cursor: pointer; transition: all 0.2s;
-}
-.hologram-btn:not(:disabled):hover { background: rgba(102, 252, 241, 0.3); transform: scale(1.05); }
-.hologram-btn:active { transform: scale(0.95); }
-.hologram-btn.correct { background: var(--correct-color); border-color: var(--correct-color); box-shadow: 0 0 20px var(--correct-color); }
-.hologram-btn.wrong { background: var(--wrong-color); border-color: var(--wrong-color); box-shadow: 0 0 20px var(--wrong-color); }
+.bottom-hud { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.2); margin-top: auto; z-index: 20; position: relative; }
 
 /* Status HUD (Fuel & Combo) */
 .status-hud { display: flex; flex-direction: column; gap: 0.5rem; padding: 0 0.5rem; }
@@ -297,3 +292,17 @@ body.fever-mode {
     border-color: #f1c40f; color: #f1c40f;
 }
 .upgrade-btn:disabled { opacity: 0.5; filter: grayscale(1); cursor: not-allowed; box-shadow: none; }
+
+/* Minions */
+.minion {
+    position: absolute;
+    font-size: 3rem;
+    cursor: crosshair;
+    z-index: 5;
+    animation: minionSpawn 0.3s ease-out;
+    filter: drop-shadow(0 0 10px #f1c40f);
+}
+@keyframes minionSpawn {
+    0% { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}

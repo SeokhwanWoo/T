@@ -19,9 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const timeLeftText = document.getElementById('time-left-text');
     const scoreEl = document.getElementById('score');
     const comboDisplay = document.getElementById('combo-display');
-    const questionEl = document.getElementById('question');
-    const optionBtns = document.querySelectorAll('.option-btn');
     const feedbackEl = document.getElementById('feedback');
+    const battleArena = document.getElementById('battle-arena');
     
     const finalScoreEl = document.getElementById('final-score');
     const ratingEl = document.getElementById('rating');
@@ -35,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const bossShield = document.getElementById('boss-shield');
     const enrageWarning = document.getElementById('enrage-warning');
     const laserBeam = document.getElementById('laser-beam');
+    
     const colorBtns = document.querySelectorAll('.color-btn');
     const charBtns = document.querySelectorAll('.char-btn');
     const bossCharBtns = document.querySelectorAll('.boss-char-btn');
@@ -75,18 +75,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let combo = 0;
     let maxTime = 30; 
     let timeLeft = maxTime;
-    let maxBossHp = 1500; 
+    let maxBossHp = 3000; // Increased HP for clicker game
     let bossHp = maxBossHp;
     let timerInterval;
-    let currentAnswer = 0;
-    let currentQuestionScore = 10;
+    let bossMoveInterval;
+    let minionSpawnInterval;
     let isPlaying = false;
+    
     let timeDilationActive = false;
     let shieldActive = false;
     let isFever = false;
     let feverTimer;
+    
     let isEnraged = false;
     let isBossShielded = false;
+    let shieldHits = 0;
     let empTimerActive = false;
 
     // Local Storage Data
@@ -123,10 +126,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    optionBtns.forEach(btn => {
-        btn.addEventListener('click', () => handleAnswer(btn));
-    });
-
     skillTime.addEventListener('click', activateTimeDilation);
     skillShield.addEventListener('click', activatePlayerShield);
     skillEmp.addEventListener('click', activateEmpBomb);
@@ -137,6 +136,10 @@ document.addEventListener('DOMContentLoaded', () => {
     buyFeverBtn.addEventListener('click', () => buyUpgrade('fever', 2000));
     buyGogglesBtn.addEventListener('click', () => buyUpgrade('goggles', 3000));
     buyEmpBtn.addEventListener('click', () => buyUpgrade('emp', 500));
+
+    // Gameplay Action Listeners
+    bossMonster.addEventListener('click', handleBossClick);
+    battleArena.addEventListener('click', handleArenaClick);
 
     function initCustomizer() {
         applyRocketColor(rocketColor);
@@ -248,18 +251,29 @@ document.addEventListener('DOMContentLoaded', () => {
         isEnraged = false;
         isBossShielded = false;
         empTimerActive = false;
+        shieldHits = 0;
+        
         document.body.classList.remove('fever-mode');
         bossShield.style.display = 'none';
         enrageWarning.className = 'enrage-warning';
         clearTimeout(feverTimer);
         
+        // Clear old minions
+        document.querySelectorAll('.minion').forEach(m => m.remove());
+        
         maxTime = 30 + (upgrades.fuel * 2);
         timeLeft = maxTime;
+        maxBossHp = 3000;
         bossHp = maxBossHp;
         isPlaying = true;
         timeDilationActive = false;
         shieldActive = false;
         
+        // Reset boss position
+        bossMonster.style.top = '50%';
+        bossMonster.style.right = '2rem';
+        bossMonster.style.left = 'auto';
+
         updateScore();
         updateCombo();
         updateFuel();
@@ -267,10 +281,10 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSkills();
         
         showScreen(gameScreen);
-        generateQuestion();
         
+        // Start Loops
         timerInterval = setInterval(() => {
-            if (empTimerActive) return; // EMP stops time completely
+            if (empTimerActive) return;
 
             let burnRate = 0.1;
             if (timeDilationActive) burnRate *= 0.5;
@@ -283,170 +297,211 @@ document.addEventListener('DOMContentLoaded', () => {
                 endGame(false); 
             }
         }, 100);
+
+        startBossMovement();
+        startMinionSpawning();
     }
 
-    function generateQuestion(isFollowUp = false) {
-        if (!isPlaying) return;
-
-        let num1, num2;
-        
-        if (isFollowUp) {
-            // Give an easier question to break the shield or do damage if shield was just broken
-            num1 = Math.floor(Math.random() * 8) + 2;
-            num2 = Math.floor(Math.random() * 8) + 2;
-        } else {
-            num1 = Math.floor(Math.random() * 8) + 2;
-            num2 = Math.floor(Math.random() * 8) + 2;
-        }
-        
-        currentAnswer = num1 * num2;
-        
-        if (num1 >= 7 && num2 >= 7) currentQuestionScore = 30;
-        else if (num1 >= 7 || num2 >= 7) currentQuestionScore = 20;
-        else currentQuestionScore = 10;
-
-        // Boss Shield Logic (Only apply if it's not a follow up and difficulty is hard)
-        if (currentQuestionScore >= 20 && !isFollowUp && !isBossShielded) {
-            isBossShielded = true;
-            bossShield.style.display = 'block';
-            showFeedback('보스 방어막 활성화! 연속 2회 타격 필요!', 'wrong');
-        }
-        
-        questionEl.textContent = `${num1} × ${num2} = ?`;
-        
-        let options = [currentAnswer];
-        while (options.length < 4) {
-            let offsetType = Math.floor(Math.random() * 3);
-            let wrongAnswer;
-            if (offsetType === 0) wrongAnswer = currentAnswer + (Math.floor(Math.random() * 3) + 1) * num1;
-            else if (offsetType === 1) wrongAnswer = currentAnswer - (Math.floor(Math.random() * 3) + 1) * num2;
-            else wrongAnswer = currentAnswer + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 5) + 1);
+    function startBossMovement() {
+        clearInterval(bossMoveInterval);
+        bossMoveInterval = setInterval(() => {
+            if (!isPlaying || empTimerActive) return;
             
-            if (wrongAnswer > 0 && !options.includes(wrongAnswer)) options.push(wrongAnswer);
-        }
-        options.sort(() => Math.random() - 0.5);
-        
-        optionBtns.forEach((btn, index) => {
-            btn.textContent = options[index];
-            btn.className = 'option-btn hologram-btn';
-            btn.disabled = false;
-        });
-        
-        feedbackEl.className = 'feedback';
-        feedbackEl.textContent = '';
+            const arenaRect = battleArena.getBoundingClientRect();
+            // Move boss within right half of the arena
+            const minTop = 20;
+            const maxTop = 80;
+            const minLeft = 50;
+            const maxLeft = 85;
+            
+            const newTop = minTop + Math.random() * (maxTop - minTop);
+            const newLeft = minLeft + Math.random() * (maxLeft - minLeft);
+            
+            bossMonster.style.top = `${newTop}%`;
+            bossMonster.style.left = `${newLeft}%`;
+            bossMonster.style.right = 'auto'; // override right
+            
+            // Randomly gain shield
+            if (isEnraged && !isBossShielded && Math.random() < 0.2) {
+                isBossShielded = true;
+                shieldHits = 3;
+                bossShield.style.display = 'block';
+                showFeedback('보스가 방어막을 전개했습니다!', 'wrong');
+            }
+        }, isEnraged ? 800 : 1500); // Moves faster when enraged
     }
 
-    function handleAnswer(btn) {
-        if (!isPlaying) return;
-        const selectedAnswer = parseInt(btn.textContent);
-        optionBtns.forEach(b => b.disabled = true);
-        
-        if (selectedAnswer === currentAnswer) {
-            combo++;
-            checkFever();
-            btn.classList.add('correct');
+    function startMinionSpawning() {
+        clearInterval(minionSpawnInterval);
+        minionSpawnInterval = setInterval(() => {
+            if (!isPlaying || empTimerActive) return;
             
-            if (isBossShielded) {
-                // Break shield
-                isBossShielded = false;
-                bossShield.style.display = 'none';
-                showFeedback('방어막 파괴! 다음 문제로 대미지를 입히세요!', 'correct');
+            // Spawn minion
+            const minion = document.createElement('div');
+            minion.className = 'minion';
+            const minionTypes = ['🛸', '🪨', '☄️', '👾'];
+            minion.textContent = minionTypes[Math.floor(Math.random() * minionTypes.length)];
+            
+            // Random position in middle
+            const newTop = 10 + Math.random() * 80;
+            const newLeft = 30 + Math.random() * 60;
+            minion.style.top = `${newTop}%`;
+            minion.style.left = `${newLeft}%`;
+            
+            minion.addEventListener('click', (e) => {
+                e.stopPropagation(); // prevent arena click miss
+                if(!isPlaying) return;
                 
-                // Fire small laser for effect
-                laserBeam.classList.add('laser-fire');
-                setTimeout(() => { laserBeam.classList.remove('laser-fire'); }, 200);
-
-                setTimeout(() => generateQuestion(true), 400);
-            } else {
-                // Deal Damage
-                const comboMultiplier = 1 + (combo * 0.1);
-                const upgradeMultiplier = 1 + (upgrades.damage * 0.2);
-                const feverMultiplier = isFever ? 2 : 1;
+                combo++;
+                checkFever();
                 
-                const gainedScore = Math.floor(currentQuestionScore * comboMultiplier * upgradeMultiplier * feverMultiplier);
-                score += gainedScore;
-                bossHp -= gainedScore;
-                
+                const points = 15 * (isFever ? 2 : 1);
+                score += points;
                 updateScore();
                 updateCombo();
-                updateBossHp();
                 updateSkills();
                 
-                if (isFever) laserBeam.classList.add('fever-laser');
-                laserBeam.classList.add('laser-fire');
+                createFloatingText(`+${points}`, '');
                 
-                setTimeout(() => {
-                    bossMonster.classList.add('boss-hit');
-                    createParticles(bossMonster);
-                    createFloatingText(`+${gainedScore}`, isFever ? 'critical' : '');
-                }, 100);
-                
-                setTimeout(() => {
-                    laserBeam.classList.remove('laser-fire');
-                    bossMonster.classList.remove('boss-hit');
-                    laserBeam.classList.remove('fever-laser');
-                }, 300);
-                
-                showFeedback(`명중! 💥 +${gainedScore} 대미지`, 'correct');
-                checkEnrage();
-                
-                if (bossHp <= 0) {
-                    setTimeout(() => endGame(true), 500); 
-                } else {
-                    setTimeout(() => generateQuestion(false), (isFever ? 200 : 400));
-                }
-            }
-        } else {
-            // Wrong Answer
-            combo = 0;
-            updateCombo();
-            updateSkills();
-            btn.classList.add('wrong');
-            
-            // If shield was broken, it regenerates
-            if (currentQuestionScore >= 20 && !isBossShielded) {
-                isBossShielded = true;
-                bossShield.style.display = 'block';
-                showFeedback('방어막이 재생성되었습니다!', 'wrong');
-            }
-
-            if (shieldActive) {
-                showFeedback('방어막 가동! 피해 무효화 🛡️', 'correct');
-                shieldActive = false;
-                skillShield.classList.remove('skill-active');
-            } else {
-                appContainer.classList.add('shake-heavy');
-                playerRocketEmoji.classList.add('ship-hit');
-                
-                let penalty = 2;
-                if (upgrades.goggles) penalty = 1;
-                
-                timeLeft -= penalty; 
-                updateFuel();
-                showFeedback(`피격! 연료 -${penalty}초 ⚠️`, 'wrong');
-                createFloatingText(`-${penalty}s`, 'wrong');
-                
-                setTimeout(() => {
-                    appContainer.classList.remove('shake-heavy');
-                    playerRocketEmoji.classList.remove('ship-hit');
-                }, 500);
-                
-                if (timeLeft <= 0) {
-                    setTimeout(() => endGame(false), 500);
-                    return;
-                }
-            }
-            
-            optionBtns.forEach(b => {
-                if (parseInt(b.textContent) === currentAnswer) b.classList.add('correct');
+                // Boom effect
+                minion.style.transform = 'scale(1.5)';
+                minion.style.opacity = '0';
+                setTimeout(() => minion.remove(), 200);
             });
             
-            setTimeout(() => generateQuestion(false), 800);
+            battleArena.appendChild(minion);
+            
+            // Disappear after a while
+            setTimeout(() => {
+                if (minion.parentNode) {
+                    minion.style.opacity = '0';
+                    setTimeout(() => minion.remove(), 200);
+                }
+            }, 3000);
+
+        }, isEnraged ? 1000 : 2000);
+    }
+
+    function handleBossClick(e) {
+        e.stopPropagation(); // Prevent triggering arena miss
+        if (!isPlaying) return;
+        
+        combo++;
+        checkFever();
+        
+        // Visual laser
+        fireLaser(bossMonster);
+        
+        if (isBossShielded) {
+            shieldHits--;
+            bossMonster.classList.add('boss-hit');
+            setTimeout(() => bossMonster.classList.remove('boss-hit'), 150);
+            
+            if (shieldHits <= 0) {
+                isBossShielded = false;
+                bossShield.style.display = 'none';
+                showFeedback('방어막 파괴!', 'correct');
+                createFloatingText('SHIELD BREAK!', 'critical');
+            } else {
+                createFloatingText(`Shield: ${shieldHits}`, '');
+            }
+        } else {
+            // Damage calculation
+            const baseDmg = 20; // Base damage per click
+            const upgradeMultiplier = 1 + (upgrades.damage * 0.2);
+            const comboMultiplier = 1 + (combo * 0.05);
+            const feverMultiplier = isFever ? 2 : 1;
+            
+            const gainedScore = Math.floor(baseDmg * upgradeMultiplier * comboMultiplier * feverMultiplier);
+            
+            score += gainedScore;
+            bossHp -= gainedScore;
+            
+            updateScore();
+            updateCombo();
+            updateBossHp();
+            updateSkills();
+            
+            bossMonster.classList.add('boss-hit');
+            createParticles(bossMonster);
+            createFloatingText(`+${gainedScore}`, isFever ? 'critical' : '');
+            
+            setTimeout(() => {
+                bossMonster.classList.remove('boss-hit');
+            }, 150);
+            
+            checkEnrage();
+            
+            if (bossHp <= 0) {
+                setTimeout(() => endGame(true), 200); 
+            }
         }
+    }
+
+    function handleArenaClick(e) {
+        // Missed click
+        if (!isPlaying || e.target !== battleArena) return;
+        
+        combo = 0;
+        updateCombo();
+        updateSkills();
+        
+        if (shieldActive) {
+            showFeedback('방어막 가동! 피해 무효화 🛡️', 'correct');
+            shieldActive = false;
+            skillShield.classList.remove('skill-active');
+        } else {
+            appContainer.classList.add('shake-heavy');
+            playerRocketEmoji.classList.add('ship-hit');
+            
+            let penalty = 2;
+            if (upgrades.goggles) penalty = 1;
+            
+            timeLeft -= penalty; 
+            updateFuel();
+            showFeedback(`빗나감! 연료 -${penalty}초 ⚠️`, 'wrong');
+            
+            // Show miss text where clicked
+            const missText = document.createElement('div');
+            missText.className = 'floating-dmg';
+            missText.style.color = '#e74c3c';
+            missText.textContent = 'MISS!';
+            missText.style.left = `${e.clientX - gameScreen.getBoundingClientRect().left}px`;
+            missText.style.top = `${e.clientY - gameScreen.getBoundingClientRect().top}px`;
+            gameScreen.appendChild(missText);
+            setTimeout(() => missText.remove(), 1000);
+            
+            setTimeout(() => {
+                appContainer.classList.remove('shake-heavy');
+                playerRocketEmoji.classList.remove('ship-hit');
+            }, 500);
+            
+            if (timeLeft <= 0) {
+                setTimeout(() => endGame(false), 500);
+            }
+        }
+    }
+
+    function fireLaser(target) {
+        if(isFever) laserBeam.classList.add('fever-laser');
+        
+        // Calculate dynamic width to target
+        const playerRect = playerRocketEmoji.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        
+        const dist = targetRect.left - playerRect.right + 20;
+        laserBeam.style.width = `${dist}px`;
+        laserBeam.style.opacity = '1';
+        
+        setTimeout(() => {
+            laserBeam.style.width = '0';
+            laserBeam.style.opacity = '0';
+            laserBeam.classList.remove('fever-laser');
+        }, 150);
     }
 
     function checkFever() {
-        if (combo >= 10 && !isFever) {
+        if (combo >= 30 && !isFever) { // 30 clicks for fever
             isFever = true;
             document.body.classList.add('fever-mode');
             appContainer.classList.add('shake-heavy');
@@ -474,7 +529,10 @@ document.addEventListener('DOMContentLoaded', () => {
             enrageWarning.textContent = '⚠️ BOSS ENRAGED! ⚠️';
             enrageWarning.classList.add('show');
             setTimeout(() => enrageWarning.classList.remove('show'), 2000);
-            showFeedback('광폭화! 연료 소모 속도 증가!', 'wrong');
+            
+            // Restart movements to apply new speed
+            startBossMovement();
+            startMinionSpawning();
         }
     }
 
@@ -486,7 +544,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const rect = bossMonster.getBoundingClientRect();
         const appRect = gameScreen.getBoundingClientRect();
         
-        // Random offset
         const offsetX = (Math.random() - 0.5) * 50;
         const offsetY = (Math.random() - 0.5) * 50;
         
@@ -527,8 +584,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function activateTimeDilation() {
-        if (combo >= 3 && !timeDilationActive) {
-            combo -= 3;
+        if (combo >= 15 && !timeDilationActive) {
+            combo -= 15;
             updateCombo();
             updateSkills();
             timeDilationActive = true;
@@ -542,8 +599,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function activatePlayerShield() {
-        if (combo >= 5 && !shieldActive) {
-            combo -= 5;
+        if (combo >= 20 && !shieldActive) {
+            combo -= 20;
             updateCombo();
             updateSkills();
             shieldActive = true;
@@ -566,7 +623,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 appContainer.classList.remove('shake-heavy');
             }, 200);
 
-            showFeedback('EMP 폭발! 방어막 무효화 및 5초 정지!', 'correct');
+            showFeedback('EMP 폭발! 미니언 파괴 및 보스 5초 정지!', 'correct');
+            
+            // Destroy all minions
+            document.querySelectorAll('.minion').forEach(m => {
+                m.style.transform = 'scale(2)';
+                m.style.opacity = '0';
+                setTimeout(() => m.remove(), 200);
+                score += 50;
+            });
+            updateScore();
             
             if (isBossShielded) {
                 isBossShielded = false;
@@ -576,14 +642,17 @@ document.addEventListener('DOMContentLoaded', () => {
             empTimerActive = true;
             setTimeout(() => {
                 empTimerActive = false;
-                showFeedback('EMP 효과 종료.', '');
             }, 5000);
         }
     }
 
     function updateSkills() {
-        skillTime.disabled = combo < 3 || timeDilationActive;
-        skillShield.disabled = combo < 5 || shieldActive;
+        // Combo requirements adjusted for clicker
+        document.querySelector('#skill-time .skill-req').textContent = '15 Combo';
+        document.querySelector('#skill-shield .skill-req').textContent = '20 Combo';
+
+        skillTime.disabled = combo < 15 || timeDilationActive;
+        skillShield.disabled = combo < 20 || shieldActive;
         
         empCountEl.textContent = upgrades.emp;
         skillEmp.disabled = upgrades.emp <= 0;
@@ -604,8 +673,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             comboDisplay.style.color = '#fff';
         }
-        if(combo >= 10) comboDisplay.style.color = '#ff00ff';
-        else if(combo >= 5) comboDisplay.style.color = '#e74c3c';
+        if(combo >= 30) comboDisplay.style.color = '#ff00ff';
+        else if(combo >= 15) comboDisplay.style.color = '#e74c3c';
     }
 
     function updateFuel() {
@@ -633,6 +702,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function endGame(isWin) {
         isPlaying = false;
         clearInterval(timerInterval);
+        clearInterval(bossMoveInterval);
+        clearInterval(minionSpawnInterval);
         clearTimeout(feverTimer);
         document.body.classList.remove('fever-mode');
         
@@ -645,11 +716,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isWin) {
             resultTitle.textContent = "보스 격파 성공! 🏆";
             resultTitle.className = "neon-text";
-            ratingEl.textContent = '은하계를 구한 영웅! ✨';
+            ratingEl.textContent = '은하계를 구한 클릭 마스터! ✨';
         } else {
             resultTitle.textContent = "연료 소진... 패배 💀";
             resultTitle.className = "neon-text text-danger";
-            ratingEl.textContent = '아쉽습니다. 상점에서 업그레이드 후 도전하세요! 🔧';
+            ratingEl.textContent = '아쉽습니다. 조준 연습을 더 하고 오세요! 🔧';
         }
         
         showScreen(resultScreen);
