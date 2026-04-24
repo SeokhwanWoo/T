@@ -59,45 +59,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // console.log('Playing sound:', type);
     }
 
-    // --- Assets Manager ---
-    const assets = {
-        imgPlayer: new Image(),
-        imgAliens: new Image(),
-        imgBosses: new Image()
-    };
+    // --- Assets Manager (Removed for zero-dependency) ---
+    // 외부 이미지나 CDN에 의존하지 않고 기본 이모지/도형만 사용하여 에러를 원천 차단합니다.
 
-    let assetsLoaded = false;
-    function loadAssets(callback) {
-        let loadedCount = 0;
-        const totalAssets = 3;
-        
-        function onImageLoad() {
-            loadedCount++;
-            if (loadedCount === totalAssets) {
-                assetsLoaded = true;
-                if (callback) callback();
-            }
-        }
-        
-        const onImageError = onImageLoad; // 실패해도 일단 진행
-
-        assets.imgPlayer.onload = onImageLoad;
-        assets.imgPlayer.onerror = onImageError;
-        assets.imgPlayer.src = './assets/player_ships.png';
-        
-        assets.imgAliens.onload = onImageLoad;
-        assets.imgAliens.onerror = onImageError;
-        assets.imgAliens.src = './assets/aliens_midboss.png';
-        
-        assets.imgBosses.onload = onImageLoad;
-        assets.imgBosses.onerror = onImageError;
-        assets.imgBosses.src = './assets/boss_hazards_items.png';
-    }
-
-    // 초기화 시 에셋 로드 시작
-    loadAssets(() => {
-        applyRocketColor(rocketColor);
-    });
+    // 초기화
+    applyRocketColor(rocketColor);
 
     // --- Game State ---
     let gameWidth = window.innerWidth;
@@ -297,16 +263,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyRocketColor(color) {
-        if (assetsLoaded) {
-            rocketPreview.textContent = '';
-            rocketPreview.style.backgroundImage = `url(${assets['player' + color.charAt(0).toUpperCase() + color.slice(1)].src})`;
-            rocketPreview.style.backgroundSize = 'contain';
-            rocketPreview.style.backgroundRepeat = 'no-repeat';
-            rocketPreview.style.backgroundPosition = 'center';
-            rocketPreview.style.width = '50px';
-            rocketPreview.style.height = '50px';
-            rocketPreview.style.filter = 'none';
-        }
+        rocketPreview.textContent = '🚀';
+        rocketPreview.style.backgroundImage = 'none';
+        rocketPreview.style.fontSize = '35px';
+        rocketPreview.style.display = 'flex';
+        rocketPreview.style.alignItems = 'center';
+        rocketPreview.style.justifyContent = 'center';
+        rocketPreview.style.width = '50px';
+        rocketPreview.style.height = '50px';
+        
+        if (color === 'red') rocketPreview.style.filter = 'hue-rotate(120deg)';
+        else if (color === 'green') rocketPreview.style.filter = 'hue-rotate(240deg)';
+        else rocketPreview.style.filter = 'none';
     }
 
     function updateShopUI() {
@@ -1181,32 +1149,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Visuals & UI ---
-    function drawClippedAsset(img, sx, sy, sw, sh, dx, dy, dw, dh, isHit) {
-        if (img.complete && img.naturalWidth > 0 && sw > 0 && sh > 0) {
-            ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
-            if (isHit) {
-                ctx.globalCompositeOperation = 'source-atop';
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.fillRect(dx, dy, dw, dh);
-                ctx.globalCompositeOperation = 'source-over';
-            }
-        } else {
-            // 이미지 로드 실패 시 대체 그래픽(폴백) 렌더링
-            ctx.fillStyle = '#ff00ff';
-            ctx.fillRect(dx, dy, dw, dh);
-            if (isHit) {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.fillRect(dx, dy, dw, dh);
-            }
-            ctx.fillStyle = '#fff';
-            ctx.font = '20px Arial';
-            ctx.fillText('?', dx + dw/2 - 5, dy + dh/2 + 5);
+    function drawEmoji(emoji, x, y, size, isHit) {
+        ctx.font = `${size * 0.8}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(emoji, x + size/2, y + size/2);
+        
+        if (isHit) {
+            ctx.globalCompositeOperation = 'source-atop';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.fillRect(x, y, size, size);
+            ctx.globalCompositeOperation = 'source-over';
         }
     }
 
     function render() {
-        if (!assetsLoaded) return;
-
         // Player
         ctx.save();
         ctx.translate(player.x, player.y);
@@ -1217,11 +1174,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const angle = Math.atan2(dy, dx) + Math.PI/2; 
         ctx.rotate(angle);
 
-        const colorIdx = rocketColor === 'red' ? 1 : (rocketColor === 'green' ? 2 : 0);
-        const psw = (assets.imgPlayer.naturalWidth || 300) / 3;
-        const psh = assets.imgPlayer.naturalHeight || 100;
+        if (rocketColor === 'red') ctx.filter = 'hue-rotate(120deg)';
+        else if (rocketColor === 'green') ctx.filter = 'hue-rotate(240deg)';
         
-        drawClippedAsset(assets.imgPlayer, colorIdx * psw, 0, psw, psh, -25, -25, 50, 50, player.isHit);
+        drawEmoji('🚀', -25, -25, 50, player.isHit);
         ctx.restore();
         
         // Drones
@@ -1229,13 +1185,14 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.save();
             ctx.translate(d.x, d.y);
             ctx.font = '20px sans-serif';
-            ctx.fillText('🛰️', -10, 10);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🛰️', 0, 0);
             ctx.restore();
         });
 
         // Enemies
-        const esw = (assets.imgAliens.naturalWidth || 500) / 5;
-        const esh = (assets.imgAliens.naturalHeight || 200) / 2;
+        const enemyEmojis = ['🛸', '👾', '👽', '💀', '☄️'];
         enemies.forEach(e => {
             ctx.save();
             ctx.translate(e.x, e.y);
@@ -1246,7 +1203,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const eAngle = Math.atan2(edy, edx) + Math.PI/2;
             ctx.rotate(eAngle);
 
-            drawClippedAsset(assets.imgAliens, e.typeIdx * esw, 0, esw, esh, -25, -25, 50, 50, e.isHit);
+            drawEmoji(enemyEmojis[e.typeIdx], -25, -25, 50, e.isHit);
             ctx.restore();
         });
 
@@ -1263,16 +1220,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const isFinal = currentBoss.isFinal;
             const size = isFinal ? 250 : 120;
+            const bEmoji = isFinal ? '👹' : '👾';
             
-            if (isFinal) {
-                const fsw = (assets.imgBosses.naturalWidth || 400) * 0.5;
-                const fsh = assets.imgBosses.naturalHeight || 200;
-                drawClippedAsset(assets.imgBosses, fsw * 0.5, 0, fsw, fsh, -size/2, -size/2, size, size, currentBoss.isHit);
-            } else {
-                const bsw = assets.imgAliens.naturalWidth || 500;
-                const bsh = (assets.imgAliens.naturalHeight || 200) / 2;
-                drawClippedAsset(assets.imgAliens, 0, bsh, bsw, bsh, -size/2, -size/2, size, size, currentBoss.isHit);
-            }
+            drawEmoji(bEmoji, -size/2, -size/2, size, currentBoss.isHit);
             ctx.restore();
         }
 
@@ -1303,28 +1253,30 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fillText('💎', g.x - 10, g.y + 10);
         });
 
-        // Asteroids
-        const asw = (assets.imgBosses.naturalWidth || 400) * 0.25;
-        const ash = assets.imgBosses.naturalHeight || 200;
+        // Asteroids (Text Fallback)
+        ctx.font = '30px sans-serif';
         asteroids.forEach(a => {
             ctx.save();
             ctx.translate(a.x, a.y);
             ctx.rotate(a.rot);
-            drawClippedAsset(assets.imgBosses, 0, 0, asw, ash, -20, -20, 40, 40, false);
+            ctx.fillText('☄️', -15, 10);
             ctx.restore();
         });
 
-        // Capsules
-        const csw = (assets.imgBosses.naturalWidth || 400) * 0.25;
-        const csh = (assets.imgBosses.naturalHeight || 200) * 0.5;
+        // Capsules (Text Fallback)
         capsules.forEach(c => {
             ctx.save();
             ctx.translate(c.x, c.y);
-            if (c.type === 'shield') {
-                drawClippedAsset(assets.imgBosses, csw * 3, 0, csw, csh, -15, -15, 30, 30, false);
-            } else {
-                drawClippedAsset(assets.imgBosses, csw * 3, csh, csw, csh, -15, -15, 30, 30, false);
-            }
+            ctx.font = '24px sans-serif';
+            ctx.fillStyle = c.type === 'shield' ? '#3498db' : '#e74c3c';
+            ctx.fillText('💊', -12, 8);
+            
+            // Draw aura
+            ctx.beginPath();
+            ctx.arc(0, 0, 18, 0, Math.PI*2);
+            ctx.strokeStyle = c.type === 'shield' ? 'rgba(52, 152, 219, 0.5)' : 'rgba(231, 76, 60, 0.5)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
             ctx.restore();
         });
     }
