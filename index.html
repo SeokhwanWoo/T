@@ -11,8 +11,11 @@
     <div id="app">
         <!-- Start Screen -->
         <div id="start-screen" class="screen active">
+            <div class="credits-display hologram-box" style="position: absolute; top: 1rem; right: 1rem; padding: 0.5rem 1rem; font-size: 1.2rem;">
+                💎 크레딧: <span id="total-credits">0</span>
+            </div>
             <h1 class="neon-text title-glow">스페이스 레이드 🚀</h1>
-            <p class="subtitle">WASD로 이동하고 적을 처치해 레벨업하세요!</p>
+            <p class="subtitle">WASD로 이동하며 마우스로 적을 직접 클릭해 사격하세요!</p>
             
             <div class="customizer hologram-box">
                 <h3>내 캐릭터 & 색상 커스터마이징</h3>
@@ -39,8 +42,42 @@
 
             <div style="display: flex; gap: 1rem; flex-direction: column; width: 100%; max-width: 300px; margin: 0 auto;">
                 <button id="start-btn" class="btn primary-btn neon-btn">전투 시작!</button>
+                <button id="shop-btn" class="btn" style="color: #f1c40f; border-color: #f1c40f; background: rgba(0,0,0,0.5); box-shadow: 0 0 10px rgba(241, 196, 15, 0.4), inset 0 0 10px rgba(241, 196, 15, 0.4);">🛒 보급소 (상점)</button>
                 <button id="view-ranking-btn" class="btn secondary-btn neon-btn">명예의 전당</button>
             </div>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shop-screen" class="screen">
+            <h2 class="neon-text" style="text-align: center; margin-bottom: 1rem;">🛒 보급소</h2>
+            <div class="credits-display hologram-box" style="text-align: center; font-size: 1.5rem; margin-bottom: 1rem; padding: 1rem;">
+                보유 크레딧: <span id="shop-credits" style="color: #f1c40f;">0</span> 💎
+            </div>
+            
+            <div class="hologram-box" style="flex: 1; overflow-y: auto;">
+                <div class="upgrade-item">
+                    <div class="upgrade-info">
+                        <div class="upgrade-name">기본 공격력 강화</div>
+                        <div class="upgrade-desc">초기 레이저 대미지가 증가합니다.</div>
+                        <div class="upgrade-level">Lv. <span id="upg-dmg-level">0</span></div>
+                    </div>
+                    <button class="btn upgrade-btn" id="buy-dmg-btn">
+                        업그레이드<br><span id="upg-dmg-cost">500</span> 💎
+                    </button>
+                </div>
+                
+                <div class="upgrade-item">
+                    <div class="upgrade-info">
+                        <div class="upgrade-name">기본 이동 속도 증가</div>
+                        <div class="upgrade-desc">우주선의 기본 이동 속도가 증가합니다.</div>
+                        <div class="upgrade-level">Lv. <span id="upg-spd-level">0</span></div>
+                    </div>
+                    <button class="btn upgrade-btn" id="buy-spd-btn">
+                        업그레이드<br><span id="upg-spd-cost">500</span> 💎
+                    </button>
+                </div>
+            </div>
+            <button id="shop-back-btn" class="btn secondary-btn neon-btn" style="margin-top: 1rem;">돌아가기</button>
         </div>
 
         <!-- Level Up Screen (Overlay) -->

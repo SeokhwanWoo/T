@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultScreen = document.getElementById('result-screen');
     const rankingScreen = document.getElementById('ranking-screen');
     const levelUpScreen = document.getElementById('level-up-screen');
+    const shopScreen = document.getElementById('shop-screen');
     const upgradeCardsContainer = document.getElementById('upgrade-cards');
     
     const startBtn = document.getElementById('start-btn');
@@ -13,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const backToStartBtn = document.getElementById('back-to-start-btn');
     const goHomeBtn = document.getElementById('go-home-btn');
     const resetRankingBtn = document.getElementById('reset-ranking-btn');
+    const shopBtn = document.getElementById('shop-btn');
+    const shopBackBtn = document.getElementById('shop-back-btn');
     
     const battleArena = document.getElementById('battle-arena');
     const playerContainer = document.getElementById('player-container');
@@ -30,6 +33,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const bossHpBar = document.getElementById('boss-hp-bar');
     const bossNameText = document.getElementById('boss-name-text');
     
+    const totalCreditsEl = document.getElementById('total-credits');
+    const shopCreditsEl = document.getElementById('shop-credits');
+    
+    // Shop Upgrades Elements
+    const upgDmgLevel = document.getElementById('upg-dmg-level');
+    const upgDmgCost = document.getElementById('upg-dmg-cost');
+    const buyDmgBtn = document.getElementById('buy-dmg-btn');
+    const upgSpdLevel = document.getElementById('upg-spd-level');
+    const upgSpdCost = document.getElementById('upg-spd-cost');
+    const buySpdBtn = document.getElementById('buy-spd-btn');
+
     // Customizer Elements
     const rocketPreview = document.getElementById('rocket-preview');
     const colorBtns = document.querySelectorAll('.color-btn');
@@ -37,10 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Audio System (Placeholder) ---
     function playSound(type) {
-        // 'shoot', 'hit', 'levelUp', 'explosion', 'ult'
         // console.log('Playing sound:', type);
-        // const audio = new Audio(`sounds/${type}.mp3`);
-        // audio.play().catch(e => {});
     }
 
     // --- Game State ---
@@ -53,23 +64,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let rankings = JSON.parse(localStorage.getItem('spaceRaidRankings')) || [];
     let playerChar = localStorage.getItem('spaceRaidPlayerChar') || '🛸';
     let rocketColor = localStorage.getItem('spaceRaidRocketColor') || 'hue-rotate(0deg)';
+    
+    let totalCredits = parseInt(localStorage.getItem('spaceRaidCredits')) || 0;
+    let persistentUpgrades = JSON.parse(localStorage.getItem('spaceRaidUpgrades')) || { damage: 0, speed: 0 };
 
     const player = {
-        x: 50, // percentage 0-100
-        y: 50,
-        width: 40, // pixels roughly
-        height: 40,
+        x: 50, y: 50,
         speed: 30, // % per second
-        hp: 100,
-        maxHp: 100,
-        level: 1,
-        exp: 0,
-        maxExp: 10,
-        damage: 20,
-        fireRate: 800, // ms between shots
-        lastShotTime: 0,
+        hp: 100, maxHp: 100,
+        level: 1, exp: 0, maxExp: 10,
+        damage: 20, 
         ultGauge: 0,
-        magnetRange: 15, // % distance
+        magnetRange: 15,
         isHit: false
     };
 
@@ -79,8 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let bullets = [];
     let enemyBullets = [];
     let gems = [];
-    let particles = [];
-    let floatingTexts = [];
     
     let enemySpawnTimer = 0;
     let enemySpawnInterval = 1500;
@@ -89,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initialization ---
     initCustomizer();
+    updateShopUI();
 
     // --- Event Listeners ---
     startBtn.addEventListener('click', startGame);
@@ -97,6 +102,9 @@ document.addEventListener('DOMContentLoaded', () => {
     backToStartBtn.addEventListener('click', () => showScreen(startScreen));
     goHomeBtn.addEventListener('click', () => showScreen(startScreen));
     
+    shopBtn.addEventListener('click', () => { updateShopUI(); showScreen(shopScreen); });
+    shopBackBtn.addEventListener('click', () => showScreen(startScreen));
+
     resetRankingBtn.addEventListener('click', () => {
         if (confirm("정말 랭킹을 초기화하시겠습니까?")) {
             rankings = [];
@@ -104,6 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
             updateRankingUI();
         }
     });
+
+    buyDmgBtn.addEventListener('click', () => buyPersistentUpgrade('damage', 500));
+    buySpdBtn.addEventListener('click', () => buyPersistentUpgrade('speed', 500));
 
     window.addEventListener('keydown', (e) => {
         if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
@@ -113,7 +124,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
     });
 
-    // --- Customizer ---
+    // Arena click for missing
+    battleArena.addEventListener('pointerdown', (e) => {
+        if (!isPlaying || isPaused) return;
+        if (e.target === battleArena) {
+            // Clicked empty space
+            fireLaserAtCoord(player.x + 10, player.y); // just shoot forward
+        }
+    });
+
+    // --- Customizer & Shop ---
     function initCustomizer() {
         applyRocketColor(rocketColor);
         applyPlayerChar(playerChar);
@@ -151,13 +171,44 @@ document.addEventListener('DOMContentLoaded', () => {
         playerRocketEmoji.textContent = char;
     }
 
+    function updateShopUI() {
+        totalCreditsEl.textContent = totalCredits;
+        shopCreditsEl.textContent = totalCredits;
+        
+        const dmgCost = 500 + (persistentUpgrades.damage * 300);
+        upgDmgLevel.textContent = persistentUpgrades.damage;
+        upgDmgCost.textContent = dmgCost;
+        buyDmgBtn.disabled = totalCredits < dmgCost;
+
+        const spdCost = 500 + (persistentUpgrades.speed * 300);
+        upgSpdLevel.textContent = persistentUpgrades.speed;
+        upgSpdCost.textContent = spdCost;
+        buySpdBtn.disabled = totalCredits < spdCost;
+        
+        localStorage.setItem('spaceRaidCredits', totalCredits);
+        localStorage.setItem('spaceRaidUpgrades', JSON.stringify(persistentUpgrades));
+    }
+
+    function buyPersistentUpgrade(type, baseCost) {
+        let cost = baseCost + (persistentUpgrades[type] * 300);
+        if (totalCredits >= cost) {
+            totalCredits -= cost;
+            persistentUpgrades[type]++;
+            updateShopUI();
+        }
+    }
+
     // --- Game Engine ---
     function startGame() {
         // Reset State
         player.x = 50; player.y = 50;
         player.hp = player.maxHp = 100;
         player.level = 1; player.exp = 0; player.maxExp = 10;
-        player.damage = 20; player.fireRate = 800; player.speed = 30;
+        
+        // Apply persistent upgrades to base stats
+        player.damage = 20 + (persistentUpgrades.damage * 5);
+        player.speed = 30 + (persistentUpgrades.speed * 5);
+        
         player.ultGauge = 0; player.magnetRange = 15;
         
         score = 0;
@@ -166,8 +217,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBoss = null;
         
         // Clear DOM entities
-        battleArena.querySelectorAll('.enemy, .gem, .bullet, .enemy-bullet, .particle, .floating-dmg, .ult-laser').forEach(e => e.remove());
-        enemies = []; bullets = []; enemyBullets = []; gems = []; particles = []; floatingTexts = [];
+        battleArena.querySelectorAll('.enemy, .boss-enemy, .gem, .bullet, .enemy-bullet, .particle, .floating-dmg, .ult-laser').forEach(e => e.remove());
+        enemies = []; bullets = []; enemyBullets = []; gems = [];
         
         updateHUD();
         bossHpContainer.style.display = 'none';
@@ -189,11 +240,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!isPaused) {
             updatePlayer(deltaTime);
-            updateShooting(timestamp);
             updateEnemies(deltaTime, timestamp);
             updateBullets(deltaTime);
             updateGems(deltaTime);
-            updateParticles(deltaTime);
             checkCollisions();
             checkBossSpawn();
         }
@@ -212,57 +261,41 @@ document.addEventListener('DOMContentLoaded', () => {
         if (keys.a || keys.ArrowLeft) dx -= player.speed * dtSec;
         if (keys.d || keys.ArrowRight) dx += player.speed * dtSec;
         
-        // Normalize diagonal speed
         if (dx !== 0 && dy !== 0) {
             dx *= 0.707; dy *= 0.707;
         }
 
         player.x += dx; player.y += dy;
         
-        // Bounds
         if (player.x < 5) player.x = 5; if (player.x > 95) player.x = 95;
         if (player.y < 5) player.y = 5; if (player.y > 95) player.y = 95;
     }
 
-    function updateShooting(timestamp) {
-        if (timestamp - player.lastShotTime > player.fireRate) {
-            fireHomingLaser();
-            player.lastShotTime = timestamp;
-        }
+    // Manual firing based on click
+    function fireLaserAtTarget(target) {
+        if (!isPlaying || isPaused) return;
+        
+        const dx = target.x - player.x;
+        const dy = target.y - player.y;
+        const length = Math.sqrt(dx*dx + dy*dy);
+        
+        if (length === 0) return;
+        
+        const vx = (dx / length) * 150; 
+        const vy = (dy / length) * 150;
+        
+        createBullet(player.x, player.y, vx, vy, false);
+        playSound('shoot');
     }
 
-    function fireHomingLaser() {
-        if (enemies.length === 0 && !bossActive) {
-            // Shoot straight right
-            createBullet(player.x, player.y, 100, 0, false);
-            playSound('shoot');
-            return;
-        }
-
-        // Find closest enemy
-        let closestDist = Infinity;
-        let target = null;
-        
-        const targetList = bossActive ? [...enemies, currentBoss] : enemies;
-
-        targetList.forEach(e => {
-            const dist = getDistance(player.x, player.y, e.x, e.y);
-            if (dist < closestDist) {
-                closestDist = dist;
-                target = e;
-            }
-        });
-
-        if (target) {
-            const dx = target.x - player.x;
-            const dy = target.y - player.y;
-            const length = Math.sqrt(dx*dx + dy*dy);
-            const vx = (dx / length) * 100; // % per second
-            const vy = (dy / length) * 100;
-            
-            createBullet(player.x, player.y, vx, vy, false);
-            playSound('shoot');
-        }
+    function fireLaserAtCoord(tx, ty) {
+        const dx = tx - player.x;
+        const dy = ty - player.y;
+        const length = Math.sqrt(dx*dx + dy*dy);
+        const vx = (dx / length) * 150; 
+        const vy = (dy / length) * 150;
+        createBullet(player.x, player.y, vx, vy, false);
+        playSound('shoot');
     }
 
     function createBullet(x, y, vx, vy, isEnemy) {
@@ -270,7 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
         el.className = isEnemy ? 'enemy-bullet' : 'bullet';
         battleArena.appendChild(el);
         
-        // Rotation for player bullet
         if (!isEnemy) {
             const angle = Math.atan2(vy, vx) * 180 / Math.PI;
             el.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
@@ -282,14 +314,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateBullets(dt) {
         const dtSec = dt / 1000;
-        
         [bullets, enemyBullets].forEach(list => {
             for (let i = list.length - 1; i >= 0; i--) {
                 const b = list[i];
                 b.x += b.vx * dtSec;
                 b.y += b.vy * dtSec;
                 
-                // Out of bounds
                 if (b.x < -10 || b.x > 110 || b.y < -10 || b.y > 110) {
                     b.el.remove();
                     list.splice(i, 1);
@@ -305,12 +335,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (enemySpawnTimer > enemySpawnInterval && !bossActive) {
             spawnEnemy();
             enemySpawnTimer = 0;
-            // Ramp up difficulty
             enemySpawnInterval = Math.max(300, enemySpawnInterval - 10);
         }
 
         enemies.forEach(e => {
-            // Move towards player
             const dx = player.x - e.x;
             const dy = player.y - e.y;
             const len = Math.sqrt(dx*dx + dy*dy);
@@ -321,7 +349,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (bossActive && currentBoss) {
-            // Boss movement (slowly towards player or hover)
             const dx = player.x - currentBoss.x;
             const dy = player.y - currentBoss.y;
             const len = Math.sqrt(dx*dx + dy*dy);
@@ -330,7 +357,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentBoss.y += (dy/len) * currentBoss.speed * dtSec;
             }
 
-            // Boss Shooting Pattern
             if (!currentBoss.lastShot || timestamp - currentBoss.lastShot > 1500) {
                 currentBoss.lastShot = timestamp;
                 fireBossBulletHell();
@@ -339,13 +365,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function spawnEnemy() {
-        const chars = ['🛸', '🪨', '☄️', '👾'];
+        // Standard emojis that don't render as X box
+        const chars = ['👽', '💀', '👿', '👹', '👾'];
         const el = document.createElement('div');
         el.className = 'enemy';
         el.textContent = chars[Math.floor(Math.random() * chars.length)];
+        
+        // Manual click targeting
+        el.addEventListener('pointerdown', (evt) => {
+            evt.stopPropagation();
+            if (!isPlaying || isPaused) return;
+            const target = enemies.find(e => e.el === el);
+            if (target) fireLaserAtTarget(target);
+        });
+
         battleArena.appendChild(el);
         
-        // Spawn edges
         let x, y;
         if (Math.random() > 0.5) {
             x = Math.random() > 0.5 ? -5 : 105;
@@ -360,7 +395,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function fireBossBulletHell() {
         playSound('shoot');
-        // 8-way shot
         for (let i = 0; i < 8; i++) {
             const angle = (Math.PI / 4) * i;
             const vx = Math.cos(angle) * 40;
@@ -375,14 +409,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const g = gems[i];
             const dist = getDistance(player.x, player.y, g.x, g.y);
             
-            // Magnet pull
             if (dist < player.magnetRange) {
                 const dx = player.x - g.x;
                 const dy = player.y - g.y;
-                g.x += (dx/dist) * 60 * dtSec; // Pull speed
+                g.x += (dx/dist) * 60 * dtSec;
                 g.y += (dy/dist) * 60 * dtSec;
                 
-                // Collect
                 if (dist < 3) {
                     g.el.remove();
                     gems.splice(i, 1);
@@ -393,18 +425,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function updateParticles(dt) {
-        // Particles handle their own animations via CSS usually, but we need to remove them
-        // Just rely on setTimeout we setup during creation
-    }
-
     function checkCollisions() {
-        // Player Bullets vs Enemies/Boss
+        // Player Bullets vs Enemies
         for (let i = bullets.length - 1; i >= 0; i--) {
             const b = bullets[i];
             let hit = false;
             
-            // Check boss
             if (bossActive && currentBoss && getDistance(b.x, b.y, currentBoss.x, currentBoss.y) < 8) {
                 damageBoss(player.damage, b.x, b.y);
                 hit = true;
@@ -440,9 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Enemies vs Player
         enemies.forEach(e => {
-            if (getDistance(e.x, e.y, player.x, player.y) < 4) {
-                damagePlayer(5); // continuous damage small ticks
-            }
+            if (getDistance(e.x, e.y, player.x, player.y) < 4) damagePlayer(5);
         });
         if (bossActive && currentBoss && getDistance(currentBoss.x, currentBoss.y, player.x, player.y) < 8) {
             damagePlayer(10);
@@ -458,6 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (e.hp <= 0) {
             score += 10;
+            totalCredits += 2; // Also gain credits
             addUltGauge(5);
             spawnGem(e.x, e.y);
             e.el.remove();
@@ -479,6 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (currentBoss.hp <= 0) {
             score += 500;
+            totalCredits += 100;
             addUltGauge(50);
             for(let i=0; i<10; i++) spawnGem(currentBoss.x + (Math.random()*10-5), currentBoss.y + (Math.random()*10-5));
             currentBoss.el.remove();
@@ -495,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function damagePlayer(amount) {
-        if (player.isHit) return; // i-frames
+        if (player.isHit) return;
         player.hp -= amount;
         player.isHit = true;
         playerRocketEmoji.classList.add('ship-hit');
@@ -511,7 +537,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function checkBossSpawn() {
-        // Spawn boss every 1000 score
         if (!bossActive && score > 0 && score % 1000 < 50 && score >= 1000) {
             spawnBoss();
         }
@@ -519,20 +544,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function spawnBoss() {
         bossActive = true;
-        const bosses = [
-            { char: '👾', name: '사이보그 네뷸라' },
-            { char: '🐙', name: '우주 크라켄' },
-            { char: '🐉', name: '항성 드래곤' },
-            { char: '🌑', name: '다크마터 소행성' }
-        ];
-        const bInfo = bosses[Math.floor(Math.random() * bosses.length)];
+        const bInfo = { char: '👾', name: '외계 대마왕' };
         
         const el = document.createElement('div');
         el.className = 'boss-enemy';
         el.textContent = bInfo.char;
+        
+        // Manual click targeting for Boss
+        el.addEventListener('pointerdown', (evt) => {
+            evt.stopPropagation();
+            if (!isPlaying || isPaused) return;
+            fireLaserAtTarget(currentBoss);
+        });
+
         battleArena.appendChild(el);
         
-        // Spawn top
         const x = 50; const y = -10;
         currentBoss = { x, y, hp: 3000 + (player.level * 500), maxHp: 3000 + (player.level * 500), speed: 5, el, lastShot: 0 };
         
@@ -576,7 +602,6 @@ document.addEventListener('DOMContentLoaded', () => {
             playSound('ult');
             appContainer.classList.add('shake-heavy');
             
-            // Visuals
             const allTargets = bossActive ? [...enemies, currentBoss] : [...enemies];
             allTargets.forEach(t => {
                 const beam = document.createElement('div');
@@ -587,7 +612,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 setTimeout(() => beam.remove(), 500);
             });
 
-            // Damage
             enemies.forEach((e, i) => damageEnemy(i, player.damage * 5, e.x, e.y));
             if (bossActive && currentBoss) damageBoss(player.damage * 5, currentBoss.x, currentBoss.y);
             
@@ -595,19 +619,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- In-game Level Up (Temporary buffs for current run) ---
     function triggerLevelUp() {
         isPaused = true;
         playSound('levelUp');
         
         const upgradesList = [
-            { id: 'dmg', name: '공격력 증가', desc: '레이저 대미지 +10', icon: '💥' },
-            { id: 'fire', name: '연사 속도 증가', desc: '레이저 발사 딜레이 -10%', icon: '⚡' },
-            { id: 'spd', name: '이동 속도 증가', desc: '우주선 이동 속도 +10%', icon: '🚀' },
-            { id: 'mag', name: '자석 반경 확대', desc: '아이템 끌어당기는 범위 +20%', icon: '🧲' },
-            { id: 'hp', name: '체력 회복', desc: 'HP 30 회복', icon: '💖' }
+            { id: 'dmg', name: '공격력 추가 증가', desc: '현재 전투 레이저 대미지 대폭 상승', icon: '💥' },
+            { id: 'spd', name: '엔진 부스트', desc: '현재 전투 우주선 이동 속도 소폭 상승', icon: '🚀' },
+            { id: 'mag', name: '자석 모듈 강화', desc: '아이템 끌어당기는 범위 확대', icon: '🧲' },
+            { id: 'hp', name: '선체 긴급 수리', desc: 'HP 30 회복', icon: '💖' }
         ];
 
-        // Shuffle and pick 3
         const shuffled = upgradesList.sort(() => 0.5 - Math.random());
         const choices = shuffled.slice(0, 3);
 
@@ -620,7 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="upg-title">${c.name}</div>
                 <div class="upg-desc">${c.desc}</div>
             `;
-            card.addEventListener('click', () => applyUpgrade(c.id));
+            card.addEventListener('click', () => applyLevelUpUpgrade(c.id));
             upgradeCardsContainer.appendChild(card);
         });
 
@@ -629,22 +652,21 @@ document.addEventListener('DOMContentLoaded', () => {
         levelUpScreen.style.pointerEvents = 'auto';
     }
 
-    function applyUpgrade(id) {
+    function applyLevelUpUpgrade(id) {
         switch(id) {
-            case 'dmg': player.damage += 10; break;
-            case 'fire': player.fireRate *= 0.9; break;
-            case 'spd': player.speed *= 1.1; break;
-            case 'mag': player.magnetRange *= 1.2; break;
+            case 'dmg': player.damage += 15; break;
+            case 'spd': player.speed += 5; break;
+            case 'mag': player.magnetRange *= 1.3; break;
             case 'hp': player.hp = Math.min(player.maxHp, player.hp + 30); break;
         }
         
         levelUpScreen.style.display = 'none';
         isPaused = false;
-        lastTime = performance.now(); // reset time delta to avoid jump
+        lastTime = performance.now(); 
         updateHUD();
     }
 
-    // --- Visuals & Juice ---
+    // --- Visuals & UI ---
     function render() {
         playerContainer.style.left = `${player.x}%`;
         playerContainer.style.top = `${player.y}%`;
@@ -714,7 +736,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => f.remove(), 1000);
     }
 
-    // --- Helpers ---
     function getDistance(x1, y1, x2, y2) {
         const dx = x2 - x1;
         const dy = y2 - y1;
@@ -727,6 +748,11 @@ document.addEventListener('DOMContentLoaded', () => {
         cancelAnimationFrame(animationFrameId);
         
         document.getElementById('final-score').textContent = score;
+        
+        // Save credits
+        localStorage.setItem('spaceRaidCredits', totalCredits);
+        updateShopUI();
+        
         showScreen(resultScreen);
         saveAndShowRanking(score);
     }

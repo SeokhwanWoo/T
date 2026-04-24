@@ -185,6 +185,22 @@ body {
 .ranking-list { list-style: none; padding: 0; text-align: left; }
 .ranking-list li { display: flex; justify-content: space-between; padding: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.2); font-size: 1.2rem; }
 
+/* Shop UI */
+.upgrade-item {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(0,0,0,0.5); padding: 1rem; border-radius: 10px;
+    margin-bottom: 0.8rem; border: 1px solid var(--secondary-color);
+}
+.upgrade-info { flex: 1; text-align: left; }
+.upgrade-name { font-size: 1.2rem; color: var(--primary-color); font-weight: bold; }
+.upgrade-desc { font-size: 0.8rem; color: #aaa; margin: 0.3rem 0; }
+.upgrade-level { font-size: 0.9rem; color: #f1c40f; }
+.upgrade-btn { 
+    width: auto; padding: 0.5rem 1rem; font-size: 1rem; background: rgba(241, 196, 15, 0.2); 
+    border-color: #f1c40f; color: #f1c40f;
+}
+.upgrade-btn:disabled { opacity: 0.5; filter: grayscale(1); cursor: not-allowed; box-shadow: none; }
+
 /* Level Up Cards */
 .upgrade-cards-container { display: flex; flex-direction: column; gap: 1rem; width: 100%; max-width: 400px; margin: 0 auto; }
 .upgrade-card {
