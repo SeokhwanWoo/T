@@ -111,6 +111,7 @@ body {
 .player-container {
     position: absolute; transform: translate(-50%, -50%); z-index: 10;
     transition: filter 0.2s; /* for hit effect */
+    pointer-events: none; /* Let clicks pass through to arena */
 }
 .ship-emoji { font-size: 3rem; filter: hue-rotate(0deg) drop-shadow(0 0 10px cyan); display: block; }
 .ship-hit { filter: drop-shadow(0 0 20px #e74c3c) brightness(0.5); }
@@ -118,10 +119,14 @@ body {
 .enemy {
     position: absolute; transform: translate(-50%, -50%); z-index: 5;
     font-size: 2.5rem; filter: drop-shadow(0 0 10px #e74c3c);
+    padding: 15px; /* Increase mobile tap hitbox */
+    cursor: pointer;
 }
 .boss-enemy {
+    position: absolute; transform: translate(-50%, -50%);
     font-size: 5rem; z-index: 6; filter: drop-shadow(0 0 30px #e74c3c);
     animation: bossPulse 2s infinite alternate;
+    padding: 20px; cursor: pointer;
 }
 @keyframes bossPulse { 0% { transform: translate(-50%, -50%) scale(1); } 100% { transform: translate(-50%, -50%) scale(1.1); } }
 
@@ -258,11 +263,38 @@ body {
 }
 @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
+/* Virtual Joystick */
+.virtual-joystick {
+    display: none; /* Hidden on desktop */
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 120px;
+    height: 120px;
+    background: rgba(102, 252, 241, 0.1);
+    border: 2px solid rgba(102, 252, 241, 0.3);
+    border-radius: 50%;
+    z-index: 1000;
+    touch-action: none;
+}
+.joystick-knob {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 50px; height: 50px;
+    background: rgba(102, 252, 241, 0.5);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 10px var(--primary-color);
+    pointer-events: none;
+}
+
 /* Mobile Optimizations */
-@media (max-width: 480px) {
+@media (pointer: coarse) and (max-width: 768px) {
+    .virtual-joystick { display: block; } /* Show on touch devices */
+    
     .ship-emoji { font-size: 2.5rem; }
-    .enemy { font-size: 2rem; }
-    .boss-enemy { font-size: 4rem; }
+    .enemy { font-size: 2.5rem; padding: 20px; } /* Even bigger hitbox */
+    .boss-enemy { font-size: 4rem; padding: 30px; }
     .btn { font-size: 1.2rem; padding: 0.8rem; }
     .level-text { font-size: 1rem; }
     .upgrade-card { padding: 1rem; }

@@ -21,6 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const playerContainer = document.getElementById('player-container');
     const playerRocketEmoji = document.getElementById('player-rocket-emoji');
     const appContainer = document.getElementById('app');
+    const virtualJoystick = document.getElementById('virtual-joystick');
+    const joystickKnob = document.getElementById('joystick-knob');
     
     // HUD Elements
     const scoreEl = document.getElementById('score');
@@ -79,7 +81,12 @@ document.addEventListener('DOMContentLoaded', () => {
         isHit: false
     };
 
-    const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, Shift: false };
+    const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+    const joystickVector = { x: 0, y: 0 };
+    let joystickActive = false;
+    let joystickTouchId = null;
+    let joystickBaseX = 0, joystickBaseY = 0;
+    const maxRadius = 50;
     
     let enemies = [];
     let bullets = [];
@@ -132,6 +139,49 @@ document.addEventListener('DOMContentLoaded', () => {
             fireLaserAtCoord(player.x + 10, player.y); // just shoot forward
         }
     });
+
+    // --- Virtual Joystick ---
+    virtualJoystick.addEventListener('pointerdown', (e) => {
+        joystickActive = true;
+        joystickTouchId = e.pointerId;
+        virtualJoystick.setPointerCapture(e.pointerId);
+        const rect = virtualJoystick.getBoundingClientRect();
+        joystickBaseX = rect.left + rect.width / 2;
+        joystickBaseY = rect.top + rect.height / 2;
+        handleJoystickMove(e);
+    });
+
+    virtualJoystick.addEventListener('pointermove', (e) => {
+        if (!joystickActive || e.pointerId !== joystickTouchId) return;
+        handleJoystickMove(e);
+    });
+
+    const stopJoystick = (e) => {
+        if (e.pointerId !== joystickTouchId) return;
+        joystickActive = false;
+        joystickVector.x = 0;
+        joystickVector.y = 0;
+        joystickKnob.style.transform = `translate(-50%, -50%)`;
+        virtualJoystick.releasePointerCapture(e.pointerId);
+    };
+    virtualJoystick.addEventListener('pointerup', stopJoystick);
+    virtualJoystick.addEventListener('pointercancel', stopJoystick);
+
+    function handleJoystickMove(e) {
+        let dx = e.clientX - joystickBaseX;
+        let dy = e.clientY - joystickBaseY;
+        const distance = Math.sqrt(dx*dx + dy*dy);
+        
+        if (distance > maxRadius) {
+            dx = (dx / distance) * maxRadius;
+            dy = (dy / distance) * maxRadius;
+        }
+        
+        joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        
+        joystickVector.x = dx / maxRadius;
+        joystickVector.y = dy / maxRadius;
+    }
 
     // --- Customizer & Shop ---
     function initCustomizer() {
@@ -256,16 +306,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const dtSec = dt / 1000;
         let dx = 0; let dy = 0;
         
-        if (keys.w || keys.ArrowUp) dy -= player.speed * dtSec;
-        if (keys.s || keys.ArrowDown) dy += player.speed * dtSec;
-        if (keys.a || keys.ArrowLeft) dx -= player.speed * dtSec;
-        if (keys.d || keys.ArrowRight) dx += player.speed * dtSec;
+        // Keyboard input
+        if (keys.w || keys.ArrowUp) dy -= 1;
+        if (keys.s || keys.ArrowDown) dy += 1;
+        if (keys.a || keys.ArrowLeft) dx -= 1;
+        if (keys.d || keys.ArrowRight) dx += 1;
         
+        // Normalize keyboard diagonal
         if (dx !== 0 && dy !== 0) {
             dx *= 0.707; dy *= 0.707;
         }
 
-        player.x += dx; player.y += dy;
+        // Add joystick input
+        dx += joystickVector.x;
+        dy += joystickVector.y;
+        
+        // Clamp total magnitude to max 1
+        const totalMag = Math.sqrt(dx*dx + dy*dy);
+        if (totalMag > 1) {
+            dx /= totalMag; dy /= totalMag;
+        }
+
+        player.x += dx * player.speed * dtSec;
+        player.y += dy * player.speed * dtSec;
         
         if (player.x < 5) player.x = 5; if (player.x > 95) player.x = 95;
         if (player.y < 5) player.y = 5; if (player.y > 95) player.y = 95;
