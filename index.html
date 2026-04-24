@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>구구단 마스터</title>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Start Screen -->
+        <div id="start-screen" class="screen active">
+            <h1>🚀 구구단 마스터 🚀</h1>
+            <p>20초 동안 최대한 많은 문제를 맞춰보세요! (최대 20단)</p>
+            <div style="display: flex; gap: 1rem; flex-direction: column;">
+                <button id="start-btn" class="btn primary-btn">게임 시작!</button>
+                <button id="view-ranking-btn" class="btn" style="background-color: var(--accent-color); color: var(--text-color); box-shadow: 0 8px 0 #feca57;">🏆 랭킹 보기</button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen">
+            <div class="header">
+                <div class="timer">⏳ <span id="time-left">20</span>초</div>
+                <div class="score">⭐ 점수: <span id="score">0</span></div>
+            </div>
+            
+            <div class="question-container">
+                <div id="question" class="question">2 × 3 = ?</div>
+            </div>
+            
+            <div class="options-container">
+                <button class="option-btn">1</button>
+                <button class="option-btn">2</button>
+                <button class="option-btn">3</button>
+                <button class="option-btn">4</button>
+            </div>
+            
+            <div id="feedback" class="feedback">정답입니다! 👏</div>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result-screen" class="screen">
+            <h2>게임 종료! 🏁</h2>
+            <div class="final-score">최종 점수: <span id="final-score">0</span>점</div>
+            <div id="rating" class="rating">대단해요! 🌟</div>
+            
+            <div class="ranking-container">
+                <h3>🏆 랭킹 (Top 5) 🏆</h3>
+                <ul id="ranking-list" class="ranking-list">
+                    <!-- 랭킹 항목이 여기에 추가됩니다 -->
+                </ul>
+            </div>
+
+            <button id="restart-btn" class="btn primary-btn">다시 하기</button>
+            <button id="go-home-btn" class="btn" style="margin-top: 1rem; background-color: #ecf0f1; color: var(--text-color); box-shadow: 0 8px 0 #bdc3c7; font-size: 1.5rem; padding: 0.8rem 2rem;">처음으로</button>
+        </div>
+
+        <!-- Ranking Screen -->
+        <div id="ranking-screen" class="screen">
+            <h2>🏆 명예의 전당 🏆</h2>
+            <div class="ranking-container">
+                <ul id="main-ranking-list" class="ranking-list">
+                    <!-- 랭킹 항목이 여기에 추가됩니다 -->
+                </ul>
+            </div>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+                <button id="back-to-start-btn" class="btn primary-btn">처음으로 돌아가기</button>
+                <button id="reset-ranking-btn" class="btn" style="background-color: var(--wrong-color); color: white; box-shadow: 0 8px 0 #c0392b;">랭킹 초기화</button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

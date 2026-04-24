@@ -1,0 +1,296 @@
+:root {
+    --bg-color: #f0f8ff;
+    --primary-color: #ff6b6b;
+    --secondary-color: #4ecdc4;
+    --accent-color: #ffe66d;
+    --text-color: #2d3436;
+    --card-bg: #ffffff;
+    --correct-color: #2ecc71;
+    --wrong-color: #e74c3c;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Jua', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+    background-image: radial-gradient(circle, #fff 10%, transparent 10%), radial-gradient(circle, #fff 10%, transparent 10%);
+    background-size: 50px 50px;
+    background-position: 0 0, 25px 25px;
+}
+
+#app {
+    width: 100%;
+    max-width: 500px;
+    height: 100vh;
+    max-height: 800px;
+    background: var(--card-bg);
+    border-radius: 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+    overflow: hidden;
+    position: relative;
+}
+
+.screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.screen.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Start Screen */
+#start-screen h1 {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+#start-screen p {
+    font-size: 1.5rem;
+    color: #636e72;
+    margin-bottom: 3rem;
+}
+
+/* Buttons */
+.btn {
+    font-family: 'Jua', sans-serif;
+    font-size: 1.8rem;
+    padding: 1rem 3rem;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    outline: none;
+}
+
+.primary-btn {
+    background-color: var(--secondary-color);
+    color: white;
+    box-shadow: 0 8px 0 #3b9b94, 0 15px 20px rgba(0,0,0,0.2);
+}
+
+.primary-btn:active {
+    transform: translateY(8px);
+    box-shadow: 0 0 0 #3b9b94, 0 5px 10px rgba(0,0,0,0.2);
+}
+
+/* Game Screen */
+#game-screen {
+    justify-content: flex-start;
+    padding-top: 2rem;
+}
+
+.header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.8rem;
+    margin-bottom: 3rem;
+    padding: 0 1rem;
+}
+
+.timer {
+    color: var(--primary-color);
+    background: #ffeaa7;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    box-shadow: 0 4px 0 #fdcb6e;
+}
+
+.score {
+    color: var(--secondary-color);
+    background: #81ecec;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    box-shadow: 0 4px 0 #00cec9;
+}
+
+.question-container {
+    background-color: var(--accent-color);
+    width: 100%;
+    padding: 3rem 1rem;
+    border-radius: 20px;
+    margin-bottom: 3rem;
+    box-shadow: 0 10px 0 #feca57;
+}
+
+.question {
+    font-size: 4rem;
+    color: #2d3436;
+}
+
+.options-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.option-btn {
+    font-family: 'Jua', sans-serif;
+    font-size: 2.5rem;
+    background-color: white;
+    color: var(--primary-color);
+    border: 4px solid var(--primary-color);
+    border-radius: 20px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 8px 0 var(--primary-color);
+}
+
+.option-btn:active {
+    transform: translateY(8px);
+    box-shadow: 0 0 0 var(--primary-color);
+}
+
+.option-btn.correct {
+    background-color: var(--correct-color);
+    border-color: var(--correct-color);
+    color: white;
+    box-shadow: 0 8px 0 #27ae60;
+}
+
+.option-btn.wrong {
+    background-color: var(--wrong-color);
+    border-color: var(--wrong-color);
+    color: white;
+    box-shadow: 0 8px 0 #c0392b;
+}
+
+.feedback {
+    font-size: 2rem;
+    margin-top: 2rem;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-weight: bold;
+}
+
+.feedback.show {
+    opacity: 1;
+}
+
+.feedback.correct {
+    color: var(--correct-color);
+}
+
+.feedback.wrong {
+    color: var(--wrong-color);
+}
+
+/* Result & Ranking Screens */
+#result-screen h2, #ranking-screen h2 {
+    font-size: 3.5rem;
+    color: var(--primary-color);
+    margin-bottom: 2rem;
+}
+
+.final-score {
+    font-size: 2.5rem;
+    background: var(--accent-color);
+    padding: 1.5rem 3rem;
+    border-radius: 30px;
+    box-shadow: 0 8px 0 #feca57;
+    margin-bottom: 2rem;
+}
+
+.rating {
+    font-size: 2rem;
+    color: var(--secondary-color);
+    margin-bottom: 2rem;
+}
+
+/* Ranking */
+.ranking-container {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 20px;
+    width: 100%;
+    margin-bottom: 2rem;
+    box-shadow: inset 0 3px 10px rgba(0,0,0,0.05);
+}
+
+.ranking-container h3 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+
+.ranking-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.ranking-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid #eee;
+    font-size: 1.2rem;
+    color: var(--text-color);
+}
+
+.ranking-list li:last-child {
+    border-bottom: none;
+}
+
+.ranking-list li:nth-child(1) { font-weight: bold; font-size: 1.4rem; color: #f39c12; }
+.ranking-list li:nth-child(2) { font-weight: bold; font-size: 1.3rem; color: #7f8c8d; }
+.ranking-list li:nth-child(3) { font-weight: bold; font-size: 1.3rem; color: #cd7f32; }
+
+/* Animations */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.shake {
+    animation: shake 0.5s;
+}
+
+@keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.pop {
+    animation: pop 0.3s;
+}
+
+/* Responsive adjustments */
+@media (max-width: 500px) {
+    #app {
+        border-radius: 0;
+        height: 100vh;
+        max-height: none;
+    }
+}
