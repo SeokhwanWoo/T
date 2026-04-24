@@ -59,6 +59,71 @@ document.addEventListener('DOMContentLoaded', () => {
         // console.log('Playing sound:', type);
     }
 
+    // --- Assets Manager ---
+    const assets = {
+        playerBlue: new Image(),
+        playerRed: new Image(),
+        playerGreen: new Image(),
+        enemies: [new Image(), new Image(), new Image(), new Image(), new Image()],
+        bossMid: new Image(),
+        bossFinal: new Image()
+    };
+
+    let assetsLoaded = false;
+    function loadAssets(callback) {
+        let loadedCount = 0;
+        const totalAssets = 3 + 5 + 2;
+        
+        function onImageLoad() {
+            loadedCount++;
+            if (loadedCount === totalAssets) {
+                assetsLoaded = true;
+                if (callback) callback();
+            }
+        }
+        
+        const onImageError = onImageLoad; // 실패해도 일단 진행
+
+        assets.playerBlue.onload = onImageLoad;
+        assets.playerBlue.onerror = onImageError;
+        assets.playerBlue.src = 'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/ship.png';
+        
+        assets.playerRed.onload = onImageLoad;
+        assets.playerRed.onerror = onImageError;
+        assets.playerRed.src = 'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/games/asteroids/ship.png';
+        
+        assets.playerGreen.onload = onImageLoad;
+        assets.playerGreen.onerror = onImageError;
+        assets.playerGreen.src = 'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/player.png';
+
+        const enemyUrls = [
+            'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/baddie.png',
+            'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/space-baddie.png',
+            'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/mine.png',
+            'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/asteroids_baddie.png',
+            'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/ufo.png'
+        ];
+        
+        enemyUrls.forEach((url, i) => {
+            assets.enemies[i].onload = onImageLoad;
+            assets.enemies[i].onerror = onImageError;
+            assets.enemies[i].src = url;
+        });
+
+        assets.bossMid.onload = onImageLoad;
+        assets.bossMid.onerror = onImageError;
+        assets.bossMid.src = 'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/phaser-dude.png';
+
+        assets.bossFinal.onload = onImageLoad;
+        assets.bossFinal.onerror = onImageError;
+        assets.bossFinal.src = 'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/bsquadron1.png';
+    }
+
+    // 초기화 시 에셋 로드 시작
+    loadAssets(() => {
+        applyRocketColor(rocketColor);
+    });
+
     // --- Game State ---
     let gameWidth = window.innerWidth;
     let gameHeight = window.innerHeight;
@@ -86,8 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let score = 0;
     let rankings = JSON.parse(localStorage.getItem('spaceRaidRankings')) || [];
-    let playerChar = localStorage.getItem('spaceRaidPlayerChar') || '🛸';
-    let rocketColor = localStorage.getItem('spaceRaidRocketColor') || 'hue-rotate(0deg)';
+    let rocketColor = localStorage.getItem('spaceRaidRocketColor') || 'blue'; // blue, red, green
     
     let totalCredits = parseInt(localStorage.getItem('spaceRaidCredits')) || 0;
     let persistentUpgrades = JSON.parse(localStorage.getItem('spaceRaidUpgrades')) || { damage: 0, speed: 0, fireRate: 0 };
@@ -97,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
         x: gameWidth / 2, y: gameHeight / 2,
         speed: 300, // px per second
         hp: 100, maxHp: 100,
-        level: 1, exp: 0, maxExp: 10,
+        level: 1, exp: 0, maxExp: 15,
         damage: 20, 
         ultGauge: 0,
         magnetRange: 150, // px
@@ -126,7 +190,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let enemyBullets = [];
     let gems = [];
     let drones = [];
-    let mousePos = { x: gameWidth / 2, y: gameHeight / 4 }; 
+    let particles = [];
+    let floatingTexts = [];
+    let cinematicEffects = [];
+    let mousePos = { x: gameWidth / 2, y: gameHeight / 4 };
     
     let enemySpawnTimer = 0;
     let enemySpawnInterval = 1500;
@@ -235,7 +302,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Customizer & Shop ---
     function initCustomizer() {
         applyRocketColor(rocketColor);
-        applyPlayerChar(playerChar);
 
         colorBtns.forEach(btn => {
             if(btn.dataset.color === rocketColor) btn.classList.add('active');
@@ -247,27 +313,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('spaceRaidRocketColor', rocketColor);
             });
         });
-
-        charBtns.forEach(btn => {
-            if(btn.dataset.char === playerChar) btn.classList.add('active');
-            btn.addEventListener('click', () => {
-                charBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                playerChar = btn.dataset.char;
-                applyPlayerChar(playerChar);
-                localStorage.setItem('spaceRaidPlayerChar', playerChar);
-            });
-        });
     }
 
     function applyRocketColor(color) {
-        rocketPreview.style.filter = color;
-        playerRocketEmoji.style.filter = `${color} drop-shadow(0 0 10px cyan)`;
-    }
-
-    function applyPlayerChar(char) {
-        rocketPreview.textContent = char;
-        playerRocketEmoji.textContent = char;
+        if (assetsLoaded) {
+            rocketPreview.textContent = '';
+            rocketPreview.style.backgroundImage = `url(${assets['player' + color.charAt(0).toUpperCase() + color.slice(1)].src})`;
+            rocketPreview.style.backgroundSize = 'contain';
+            rocketPreview.style.backgroundRepeat = 'no-repeat';
+            rocketPreview.style.backgroundPosition = 'center';
+            rocketPreview.style.width = '50px';
+            rocketPreview.style.height = '50px';
+            rocketPreview.style.filter = 'none';
+        }
     }
 
     function updateShopUI() {
@@ -381,12 +439,45 @@ document.addEventListener('DOMContentLoaded', () => {
             updateBullets(deltaTime);
             updateGems(deltaTime);
             checkCollisions();
-            checkBossSpawn();
+            updateEffects(deltaTime);
         }
 
         drawStarfield(deltaTime);
         render();
         animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    function updateEffects(dt) {
+        const dtSec = dt / 1000;
+        [particles, floatingTexts, cinematicEffects].forEach(list => {
+            for (let i = list.length - 1; i >= 0; i--) {
+                const e = list[i];
+                e.life -= dtSec;
+                if (e.update) e.update(dtSec);
+                if (e.life <= 0) {
+                    e.el.remove();
+                    list.splice(i, 1);
+                }
+            }
+        });
+
+        // Update Hit Timers for Flash Effects
+        if (player.isHit) {
+            player.hitTimer -= dtSec;
+            if (player.hitTimer <= 0) player.isHit = false;
+        }
+        
+        enemies.forEach(e => {
+            if (e.isHit) {
+                e.hitTimer -= dtSec;
+                if (e.hitTimer <= 0) e.isHit = false;
+            }
+        });
+
+        if (bossActive && currentBoss && currentBoss.isHit) {
+            currentBoss.hitTimer -= dtSec;
+            if (currentBoss.hitTimer <= 0) currentBoss.isHit = false;
+        }
     }
 
     // --- Update Logic ---
@@ -466,8 +557,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             d.x += (targetX - d.x) * 5 * dtSec;
             d.y += (targetY - d.y) * 5 * dtSec;
-            d.el.style.left = `${d.x}px`;
-            d.el.style.top = `${d.y}px`;
             
             d.fireTimer += dt;
             if (d.fireTimer >= 800) {
@@ -495,10 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createDroneBullet(x, y, vx, vy) {
-        const el = document.createElement('div');
-        el.className = 'drone-bullet';
-        battleArena.appendChild(el);
-        bullets.push({ id: Math.random(), x, y, vx, vy, el, isEnemy: false, damageMult: 0.5, hitSet: null, pierceCount: 0 });
+        bullets.push({ id: Math.random(), x, y, vx, vy, isEnemy: false, damageMult: 0.5, hitSet: null, pierceCount: 0 });
         playSound('shoot');
     }
 
@@ -524,21 +610,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createBullet(x, y, vx, vy, isEnemy) {
-        const el = document.createElement('div');
-        el.className = isEnemy ? 'enemy-bullet' : 'bullet';
-        battleArena.appendChild(el);
-        
-        if (!isEnemy) {
-            const angle = Math.atan2(vy, vx) * 180 / Math.PI;
-            el.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
-        }
-
         const isPiercing = !isEnemy && player.piercingLevel > 0;
         const hitSet = isPiercing ? new Set() : null;
         const pierceCount = isPiercing ? player.piercingLevel : 0;
 
         const list = isEnemy ? enemyBullets : bullets;
-        list.push({ id: Math.random(), x, y, vx, vy, el, isEnemy, damageMult: 1, hitSet, pierceCount });
+        list.push({ id: Math.random(), x, y, vx, vy, isEnemy, damageMult: 1, hitSet, pierceCount });
     }
 
     function updateBullets(dt) {
@@ -550,7 +627,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 b.y += b.vy * dtSec;
                 
                 if (b.x < -50 || b.x > gameWidth + 50 || b.y < -50 || b.y > gameHeight + 50) {
-                    b.el.remove();
                     list.splice(i, 1);
                 }
             }
@@ -561,7 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const dtSec = dt / 1000;
         enemySpawnTimer += dt;
         
-        if (enemySpawnTimer > enemySpawnInterval && !bossActive) {
+        if (enemySpawnTimer > enemySpawnInterval && !bossActive && player.level !== 5 && player.level !== 10) {
             spawnEnemy();
             enemySpawnTimer = 0;
             enemySpawnInterval = Math.max(300, enemySpawnInterval - 10);
@@ -578,15 +654,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (bossActive && currentBoss) {
-            const dx = player.x - currentBoss.x;
-            const dy = player.y - currentBoss.y;
-            const len = Math.sqrt(dx*dx + dy*dy);
-            if (len > 100) {
-                currentBoss.x += (dx/len) * currentBoss.speed * dtSec;
-                currentBoss.y += (dy/len) * currentBoss.speed * dtSec;
+            // Boss Movement AI
+            if (currentBoss.isFinal) {
+                // LV 10 Final Boss: 화면 상단을 천천히 좌우 왕복
+                currentBoss.y = Math.min(100, currentBoss.y + currentBoss.speed * dtSec); // 상단 100px 부근 고정
+                currentBoss.x += currentBoss.speed * currentBoss.dir * dtSec;
+                if (currentBoss.x < 150) currentBoss.dir = 1;
+                if (currentBoss.x > gameWidth - 150) currentBoss.dir = -1;
+            } else {
+                // LV 5 Mid Boss: 좌우로 빠르게 이동
+                currentBoss.y = Math.min(150, currentBoss.y + currentBoss.speed * dtSec);
+                currentBoss.x += currentBoss.speed * currentBoss.dir * dtSec;
+                if (currentBoss.x < 100) currentBoss.dir = 1;
+                if (currentBoss.x > gameWidth - 100) currentBoss.dir = -1;
             }
 
-            if (!currentBoss.lastShot || timestamp - currentBoss.lastShot > 1500) {
+            if (!currentBoss.lastShot || timestamp - currentBoss.lastShot > (currentBoss.isFinal ? 1000 : 1500)) {
                 currentBoss.lastShot = timestamp;
                 fireBossBulletHell();
             }
@@ -594,15 +677,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function spawnEnemy() {
-        // Standard emojis that don't render as X box
-        const chars = ['👽', '💀', '👿', '👹', '👾'];
-        const el = document.createElement('div');
-        el.className = 'enemy';
-        el.textContent = chars[Math.floor(Math.random() * chars.length)];
-        
-        // 클릭 이벤트 제거 (자동 사격)
-        battleArena.appendChild(el);
-        
         let x, y;
         if (Math.random() > 0.5) {
             x = Math.random() > 0.5 ? -50 : gameWidth + 50;
@@ -612,16 +686,36 @@ document.addEventListener('DOMContentLoaded', () => {
             y = Math.random() > 0.5 ? -50 : gameHeight + 50;
         }
 
-        enemies.push({ x, y, hp: 40 + (player.level * 10), maxHp: 40 + (player.level * 10), speed: 50 + Math.random() * 50, el });
+        // Random enemy asset index
+        const typeIdx = Math.floor(Math.random() * 5);
+        enemies.push({ x, y, hp: 40 + (player.level * 10), maxHp: 40 + (player.level * 10), speed: 50 + Math.random() * 50, typeIdx, isHit: false, hitTimer: 0 });
     }
 
     function fireBossBulletHell() {
         playSound('shoot');
-        for (let i = 0; i < 8; i++) {
-            const angle = (Math.PI / 4) * i;
-            const vx = Math.cos(angle) * 300;
-            const vy = Math.sin(angle) * 300;
-            createBullet(currentBoss.x, currentBoss.y, vx, vy, true);
+        
+        if (currentBoss.isFinal) {
+            // 원형(360도) 흩뿌리기 탄막
+            const numBullets = 24;
+            const angleOffset = Math.random() * Math.PI; // 회전 효과
+            for (let i = 0; i < numBullets; i++) {
+                const angle = (Math.PI * 2 / numBullets) * i + angleOffset;
+                const vx = Math.cos(angle) * 200;
+                const vy = Math.sin(angle) * 200;
+                createBullet(currentBoss.x, currentBoss.y, vx, vy, true);
+            }
+        } else {
+            // 플레이어 방향 3갈래
+            const dx = player.x - currentBoss.x;
+            const dy = player.y - currentBoss.y;
+            const baseAngle = Math.atan2(dy, dx);
+            
+            [-0.2, 0, 0.2].forEach(offset => {
+                const angle = baseAngle + offset;
+                const vx = Math.cos(angle) * 400;
+                const vy = Math.sin(angle) * 400;
+                createBullet(currentBoss.x, currentBoss.y, vx, vy, true);
+            });
         }
     }
 
@@ -638,7 +732,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 g.y += (dy/dist) * 300 * dtSec;
                 
                 if (dist < 15) {
-                    g.el.remove();
                     gems.splice(i, 1);
                     gainExp(1);
                     playSound('hit');
@@ -680,7 +773,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (b.pierceCount > 0) {
                     b.pierceCount--;
                 } else {
-                    b.el.remove();
                     bullets.splice(i, 1);
                 }
             }
@@ -691,7 +783,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const b = enemyBullets[i];
             if (getDistance(b.x, b.y, player.x, player.y) < 15) {
                 damagePlayer(15);
-                b.el.remove();
                 enemyBullets.splice(i, 1);
             }
         }
@@ -722,16 +813,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (e.hp <= 0) {
             score += 10;
-            totalCredits += 2; // Also gain credits
+            totalCredits += 2; 
             addUltGauge(5);
             spawnGem(e.x, e.y);
             createParticleExplosion(e.x, e.y);
-            e.el.remove();
             enemies.splice(index, 1);
             updateHUD();
         } else {
-            e.el.style.filter = 'drop-shadow(0 0 20px #fff) brightness(2)';
-            setTimeout(() => { if(e.el) e.el.style.filter = 'drop-shadow(0 0 10px #e74c3c)'; }, 100);
+            e.isHit = true;
+            e.hitTimer = 0.1; // 100ms
         }
     }
 
@@ -750,16 +840,29 @@ document.addEventListener('DOMContentLoaded', () => {
             addUltGauge(50);
             for(let i=0; i<10; i++) spawnGem(currentBoss.x + (Math.random()*10-5), currentBoss.y + (Math.random()*10-5));
             createParticleExplosion(currentBoss.x, currentBoss.y);
-            currentBoss.el.remove();
+            
+            const killedBossLevel = player.level;
             bossActive = false;
             currentBoss = null;
             bossHpContainer.style.display = 'none';
             triggerShake('shake-heavy');
             playSound('explosion');
             updateHUD();
+            
+            if (killedBossLevel === 10) {
+                const cText = document.getElementById('cinematic-text');
+                cText.style.display = 'block';
+                document.getElementById('cinematic-title').textContent = 'MISSION COMPLETE';
+                document.getElementById('cinematic-subtitle').textContent = '우주의 평화를 지켰습니다!';
+                document.getElementById('cinematic-title').style.color = '#2ecc71';
+                setTimeout(() => endGame(true), 3000);
+            } else {
+                player.exp = player.maxExp;
+                gainExp(0); // Trigger level 6
+            }
         } else {
-            currentBoss.el.style.filter = 'drop-shadow(0 0 40px #fff) brightness(2)';
-            setTimeout(() => { if(currentBoss && currentBoss.el) currentBoss.el.style.filter = 'drop-shadow(0 0 30px #e74c3c)'; }, 100);
+            currentBoss.isHit = true;
+            currentBoss.hitTimer = 0.1;
         }
     }
 
@@ -767,37 +870,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (player.isHit) return;
         player.hp -= amount;
         player.isHit = true;
-        playerRocketEmoji.classList.add('ship-hit');
+        player.hitTimer = 0.5;
         triggerShake('shake-light');
         updateHUD();
         
-        setTimeout(() => {
-            player.isHit = false;
-            playerRocketEmoji.classList.remove('ship-hit');
-        }, 500);
-
         if (player.hp <= 0) endGame();
     }
 
-    function checkBossSpawn() {
-        if (!bossActive && score > 0 && score % 1000 < 50 && score >= 1000) {
-            spawnBoss();
-        }
-    }
-
-    function spawnBoss() {
+    function spawnBoss(level) {
         bossActive = true;
-        const bInfo = { char: '👾', name: '외계 대마왕' };
-        
-        const el = document.createElement('div');
-        el.className = 'boss-enemy';
-        el.textContent = bInfo.char;
-        
-        // 보스도 자동 사격 대상이므로 클릭 이벤트 제거
-        battleArena.appendChild(el);
+        const isFinal = level === 10;
+        const bInfo = isFinal ? { name: '우주 포식자 (최종 보스)' } : { name: '외계 대마왕 (중간 보스)' };
         
         const x = gameWidth / 2; const y = -100;
-        currentBoss = { x, y, hp: 3000 + (player.level * 500), maxHp: 3000 + (player.level * 500), speed: 30, el, lastShot: 0 };
+        const maxHp = 5000 + (level * 1000);
+        // dir 변수 추가 (이동 방향)
+        currentBoss = { x, y, hp: maxHp, maxHp: maxHp, speed: isFinal ? 150 : 300, dir: 1, isFinal, isHit: false, hitTimer: 0, lastShot: 0 };
         
         bossHpContainer.style.display = 'block';
         bossHpBar.style.width = '100%';
@@ -808,20 +896,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function spawnGem(x, y) {
-        const el = document.createElement('div');
-        el.className = 'gem';
-        el.textContent = '💎';
-        battleArena.appendChild(el);
-        gems.push({ id: Math.random(), x, y, el });
+        gems.push({ id: Math.random(), x, y });
     }
 
     function gainExp(amount) {
+        if (bossActive) return;
+
         player.exp += amount;
         if (player.exp >= player.maxExp) {
             player.exp -= player.maxExp;
             player.level++;
-            player.maxExp = Math.floor(player.maxExp * 1.5);
-            triggerLevelUp();
+            
+            if (player.level > 10) player.level = 10;
+            
+            player.maxExp = 10 + (player.level * 5); 
+            
+            if (player.level === 5 || player.level === 10) {
+                triggerBossWarning(player.level);
+            } else {
+                triggerLevelUp();
+            }
         }
         updateHUD();
     }
@@ -830,10 +924,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (player.ultGauge >= 100) return;
         player.ultGauge = Math.min(100, player.ultGauge + amount);
         updateHUD();
-        
-        if (player.ultGauge >= 100 && isPlaying && !isPaused) {
-            checkUltimate();
-        }
+        // 궁극기 자동 발사 버그 원인 제거 (수동 발사만 지원)
     }
 
     function checkUltimate() {
@@ -849,7 +940,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const flash = document.createElement('div');
         flash.className = 'screen-flash';
         gameScreen.appendChild(flash);
-        setTimeout(() => flash.remove(), 500);
+        cinematicEffects.push({ el: flash, life: 0.5 });
 
         const allTargets = bossActive ? [...enemies, currentBoss] : [...enemies];
         allTargets.forEach(t => {
@@ -859,7 +950,7 @@ document.addEventListener('DOMContentLoaded', () => {
             exp.style.left = `${t.x}px`;
             exp.style.top = `${t.y}px`;
             battleArena.appendChild(exp);
-            setTimeout(() => exp.remove(), 500);
+            cinematicEffects.push({ el: exp, life: 0.5 });
             
             // Giant Laser
             const beam = document.createElement('div');
@@ -868,7 +959,7 @@ document.addEventListener('DOMContentLoaded', () => {
             beam.style.top = `${t.y}px`;
             beam.style.width = '20px'; // Thicker
             battleArena.appendChild(beam);
-            setTimeout(() => beam.remove(), 500);
+            cinematicEffects.push({ el: beam, life: 0.5 });
         });
 
         // Instant Kill all normal enemies
@@ -889,6 +980,37 @@ document.addEventListener('DOMContentLoaded', () => {
         isPaused = true;
         playSound('levelUp');
         
+        const cText = document.getElementById('cinematic-text');
+        cText.style.display = 'block';
+        document.getElementById('cinematic-title').textContent = 'LEVEL UP!';
+        document.getElementById('cinematic-subtitle').textContent = '난이도가 상승합니다!';
+        
+        setTimeout(() => {
+            cText.style.display = 'none';
+            showUpgradeCards();
+        }, 1500);
+    }
+
+    function triggerBossWarning(level) {
+        isPaused = true;
+        playSound('levelUp'); // Warning sound would be better, using levelUp for now
+        
+        const cText = document.getElementById('cinematic-text');
+        cText.style.display = 'block';
+        document.getElementById('cinematic-title').textContent = 'WARNING!';
+        document.getElementById('cinematic-subtitle').textContent = level === 10 ? '최종 보스 접근 중...' : '거대 보스 접근 중...';
+        document.getElementById('cinematic-title').style.color = '#e74c3c';
+        
+        setTimeout(() => {
+            cText.style.display = 'none';
+            document.getElementById('cinematic-title').style.color = '';
+            isPaused = false;
+            lastTime = performance.now();
+            spawnBoss(level);
+        }, 2000);
+    }
+
+    function showUpgradeCards() {
         const upgradesList = [
             { id: 'dmg', name: '공격력 추가 증가', desc: '현재 전투 레이저 대미지 대폭 상승', icon: '💥' },
             { id: 'spd', name: '엔진 부스트', desc: '현재 전투 우주선 이동 속도 소폭 상승', icon: '🚀' },
@@ -930,11 +1052,7 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'piercing': player.piercingLevel++; break;
             case 'drone': 
                 player.hasDrone = true;
-                let droneEl = document.createElement('div');
-                droneEl.className = 'drone';
-                droneEl.textContent = '🛰️';
-                battleArena.appendChild(droneEl);
-                drones.push({ x: player.x, y: player.y, el: droneEl, fireTimer: 0 });
+                drones.push({ x: player.x, y: player.y, fireTimer: 0 });
                 break;
         }
         
@@ -945,22 +1063,106 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Visuals & UI ---
-    function render() {
-        playerContainer.style.left = `${player.x}px`;
-        playerContainer.style.top = `${player.y}px`;
+    function drawAsset(img, x, y, w, h) {
+        if (img.complete && img.naturalWidth > 0) {
+            ctx.drawImage(img, x, y, w, h);
+        } else {
+            // 이미지 로드 실패 시 대체 그래픽(폴백) 렌더링
+            ctx.fillStyle = '#ff00ff';
+            ctx.fillRect(x, y, w, h);
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px Arial';
+            ctx.fillText('?', x + w/2 - 5, y + h/2 + 5);
+        }
+    }
 
-        enemies.forEach(e => {
-            if(e.el) { e.el.style.left = `${e.x}px`; e.el.style.top = `${e.y}px`; }
-        });
+    function render() {
+        if (!assetsLoaded) return;
+
+        // Player
+        ctx.save();
+        ctx.translate(player.x, player.y);
         
-        if (bossActive && currentBoss && currentBoss.el) {
-            currentBoss.el.style.left = `${currentBoss.x}px`;
-            currentBoss.el.style.top = `${currentBoss.y}px`;
+        // Rotate player towards mouse
+        const dx = mousePos.x - player.x;
+        const dy = mousePos.y - player.y;
+        const angle = Math.atan2(dy, dx) + Math.PI/2; // +90deg to face top
+        ctx.rotate(angle);
+
+        if (player.isHit) ctx.globalAlpha = 0.5;
+        
+        let pAsset = assets.playerBlue;
+        if (rocketColor === 'red') pAsset = assets.playerRed;
+        if (rocketColor === 'green') pAsset = assets.playerGreen;
+        
+        drawAsset(pAsset, -25, -25, 50, 50);
+        ctx.restore();
+        
+        // Drones
+        drones.forEach(d => {
+            ctx.save();
+            ctx.translate(d.x, d.y);
+            ctx.font = '20px sans-serif';
+            ctx.fillText('🛰️', -10, 10);
+            ctx.restore();
+        });
+
+        // Enemies
+        enemies.forEach(e => {
+            ctx.save();
+            ctx.translate(e.x, e.y);
+            
+            // rotate towards player
+            const edx = player.x - e.x;
+            const edy = player.y - e.y;
+            const eAngle = Math.atan2(edy, edx) + Math.PI/2;
+            ctx.rotate(eAngle);
+
+            if (e.isHit) ctx.globalAlpha = 0.5;
+            drawAsset(assets.enemies[e.typeIdx], -25, -25, 50, 50);
+            ctx.restore();
+        });
+
+        // Boss
+        if (bossActive && currentBoss) {
+            ctx.save();
+            ctx.translate(currentBoss.x, currentBoss.y);
+            
+            const isFinal = currentBoss.isFinal;
+            const size = isFinal ? 250 : 120;
+            const bAsset = isFinal ? assets.bossFinal : assets.bossMid;
+            
+            if (currentBoss.isHit) ctx.globalAlpha = 0.5;
+            drawAsset(bAsset, -size/2, -size/2, size, size);
+            ctx.restore();
         }
 
-        bullets.forEach(b => { if(b.el) { b.el.style.left = `${b.x}px`; b.el.style.top = `${b.y}px`; } });
-        enemyBullets.forEach(b => { if(b.el) { b.el.style.left = `${b.x}px`; b.el.style.top = `${b.y}px`; } });
-        gems.forEach(g => { if(g.el) { g.el.style.left = `${g.x}px`; g.el.style.top = `${g.y}px`; } });
+        // Bullets
+        ctx.fillStyle = '#3498db'; 
+        bullets.forEach(b => {
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            const bAngle = Math.atan2(b.vy, b.vx);
+            ctx.rotate(bAngle);
+            ctx.fillRect(-10, -2, 20, 4); 
+            ctx.restore();
+        });
+
+        ctx.fillStyle = '#e74c3c'; 
+        enemyBullets.forEach(b => {
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            ctx.beginPath();
+            ctx.arc(0, 0, 5, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        });
+
+        // Gems
+        ctx.font = '20px sans-serif';
+        gems.forEach(g => {
+            ctx.fillText('💎', g.x - 10, g.y + 10);
+        });
     }
 
     function updateHUD() {
@@ -990,19 +1192,20 @@ document.addEventListener('DOMContentLoaded', () => {
             p.style.left = `${x}px`;
             p.style.top = `${y}px`;
             const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * 80 + 20; // 픽셀 스케일로 키움
+            const dist = Math.random() * 80 + 20; 
             const tx = x + Math.cos(angle) * dist;
             const ty = y + Math.sin(angle) * dist;
             p.style.transition = 'all 0.5s cubic-bezier(0.1, 0.8, 0.3, 1)';
             battleArena.appendChild(p);
             
-            setTimeout(() => {
+            // Trigger animation next frame
+            requestAnimationFrame(() => {
                 p.style.left = `${tx}px`;
                 p.style.top = `${ty}px`;
                 p.style.opacity = '0';
-            }, 10);
+            });
             
-            setTimeout(() => p.remove(), 500);
+            particles.push({ el: p, life: 0.5 });
         }
     }
 
@@ -1012,7 +1215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         p.style.left = `${x}px`;
         p.style.top = `${y}px`;
         battleArena.appendChild(p);
-        setTimeout(() => p.remove(), 200);
+        particles.push({ el: p, life: 0.2 });
     }
 
     function createFloatingText(text, x, y, isCrit) {
@@ -1022,7 +1225,7 @@ document.addEventListener('DOMContentLoaded', () => {
         floatEl.style.left = `calc(${x}px + ${(Math.random()-0.5)*40}px)`;
         floatEl.style.top = `calc(${y}px + ${(Math.random()-0.5)*40}px)`;
         battleArena.appendChild(floatEl);
-        setTimeout(() => floatEl.remove(), 800);
+        floatingTexts.push({ el: floatEl, life: 0.8 });
     }
 
     function showFeedback(text, type) {
@@ -1034,7 +1237,7 @@ document.addEventListener('DOMContentLoaded', () => {
         f.style.transform = 'translate(-50%, 0)';
         f.textContent = text;
         battleArena.appendChild(f);
-        setTimeout(() => f.remove(), 1000);
+        floatingTexts.push({ el: f, life: 1.0 });
     }
 
     function getDistance(x1, y1, x2, y2) {
@@ -1044,10 +1247,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- End Game ---
-    function endGame() {
+    function endGame(isVictory = false) {
         isPlaying = false;
         cancelAnimationFrame(animationFrameId);
         
+        if (isVictory) score += 10000;
         document.getElementById('final-score').textContent = score;
         
         // Save credits
