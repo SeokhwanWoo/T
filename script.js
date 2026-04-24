@@ -165,14 +165,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function generateQuestion() {
         if (!isPlaying) return;
 
-        // Generate numbers between 2 and 20
-        const num1 = Math.floor(Math.random() * 19) + 2;
-        const num2 = Math.floor(Math.random() * 19) + 2;
+        // Generate numbers between 2 and 9
+        const num1 = Math.floor(Math.random() * 8) + 2;
+        const num2 = Math.floor(Math.random() * 8) + 2;
         currentAnswer = num1 * num2;
         
-        // Difficulty scoring
-        if (num1 >= 10 && num2 >= 10) currentQuestionScore = 30;
-        else if (num1 >= 10 || num2 >= 10) currentQuestionScore = 20;
+        // Difficulty scoring (Adjusted for 9-dan)
+        if (num1 >= 7 && num2 >= 7) currentQuestionScore = 30;
+        else if (num1 >= 7 || num2 >= 7) currentQuestionScore = 20;
         else currentQuestionScore = 10;
         
         questionEl.textContent = `${num1} × ${num2} = ?`;
