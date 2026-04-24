@@ -77,6 +77,10 @@ body {
 .color-options { display: flex; justify-content: center; gap: 0.8rem; }
 .color-btn { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid; transition: transform 0.2s; outline: none; }
 .color-btn:hover, .color-btn.active { transform: scale(1.3); }
+.char-btn, .boss-char-btn { font-size: 1.5rem; background: transparent; border: 2px solid transparent; border-radius: 10px; cursor: pointer; transition: all 0.2s; padding: 0.2rem; filter: grayscale(1); opacity: 0.6; }
+.char-btn:hover, .boss-char-btn:hover { filter: grayscale(0); opacity: 1; transform: scale(1.2); }
+.char-btn.active, .boss-char-btn.active { filter: grayscale(0); opacity: 1; border-color: var(--primary-color); background: rgba(102, 252, 241, 0.2); }
+.boss-char-btn.active { border-color: #e74c3c; background: rgba(231, 76, 60, 0.2); }
 
 /* Buttons */
 .btn {

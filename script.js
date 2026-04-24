@@ -29,11 +29,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const rocketPreview = document.getElementById('rocket-preview');
     const playerRocketEmoji = document.getElementById('player-rocket-emoji');
+    const bossPreview = document.getElementById('boss-preview');
+    const bossMonsterEmoji = document.querySelector('.boss-emoji');
     const bossMonster = document.getElementById('boss-monster');
     const bossShield = document.getElementById('boss-shield');
     const enrageWarning = document.getElementById('enrage-warning');
     const laserBeam = document.getElementById('laser-beam');
     const colorBtns = document.querySelectorAll('.color-btn');
+    const charBtns = document.querySelectorAll('.char-btn');
+    const bossCharBtns = document.querySelectorAll('.boss-char-btn');
 
     const bossHpBar = document.getElementById('boss-hp-bar');
     const bossHpText = document.getElementById('boss-hp-text');
@@ -87,6 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Local Storage Data
     let rocketColor = localStorage.getItem('gugudanRocketColor') || 'hue-rotate(0deg)';
+    let playerChar = localStorage.getItem('gugudanPlayerChar') || '🛸';
+    let bossChar = localStorage.getItem('gugudanBossChar') || '👾';
     let rankings = JSON.parse(localStorage.getItem('gugudanRankings')) || [];
     let totalCredits = parseInt(localStorage.getItem('gugudanCredits')) || 0;
     let upgrades = JSON.parse(localStorage.getItem('gugudanUpgrades')) || { fuel: 0, damage: 0, fever: 0, goggles: false, emp: 0 };
@@ -134,6 +140,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initCustomizer() {
         applyRocketColor(rocketColor);
+        applyPlayerChar(playerChar);
+        applyBossChar(bossChar);
+
         colorBtns.forEach(btn => {
             if(btn.dataset.color === rocketColor) btn.classList.add('active');
             btn.addEventListener('click', (e) => {
@@ -144,11 +153,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('gugudanRocketColor', rocketColor);
             });
         });
+
+        charBtns.forEach(btn => {
+            if(btn.dataset.char === playerChar) btn.classList.add('active');
+            btn.addEventListener('click', (e) => {
+                charBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                playerChar = btn.dataset.char;
+                applyPlayerChar(playerChar);
+                localStorage.setItem('gugudanPlayerChar', playerChar);
+            });
+        });
+
+        bossCharBtns.forEach(btn => {
+            if(btn.dataset.char === bossChar) btn.classList.add('active');
+            btn.addEventListener('click', (e) => {
+                bossCharBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                bossChar = btn.dataset.char;
+                applyBossChar(bossChar);
+                localStorage.setItem('gugudanBossChar', bossChar);
+            });
+        });
     }
 
     function applyRocketColor(color) {
         rocketPreview.style.filter = color;
         playerRocketEmoji.style.filter = `${color} drop-shadow(0 0 10px cyan)`;
+    }
+
+    function applyPlayerChar(char) {
+        rocketPreview.textContent = char;
+        playerRocketEmoji.textContent = char;
+    }
+
+    function applyBossChar(char) {
+        bossPreview.textContent = char;
+        bossMonsterEmoji.textContent = char;
     }
 
     function updateShopUI() {
