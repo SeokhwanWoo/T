@@ -3,26 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>구구단 마스터: 우주 레이싱</title>
+    <title>구구단 마스터 🚀🚀</title>
     <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="space-background">
-        <div class="stars"></div>
-        <div class="stars2"></div>
-        <div class="stars3"></div>
-    </div>
+    <div id="space-background"></div>
     
     <div id="app">
         <!-- Start Screen -->
         <div id="start-screen" class="screen active">
-            <h1 class="neon-text">🚀 구구단 마스터 🚀</h1>
-            <p class="subtitle">15초 연료! 가장 멀리 날아가는 로켓이 되세요! (최대 9단)</p>
+            <h1 class="neon-text title-glow">구구단 마스터 🚀🚀</h1>
+            <p class="subtitle">사이보그 네뷸라 보스를 격파하세요! (최대 9단)</p>
             
             <div class="customizer hologram-box">
-                <h3>내 로켓 커스터마이징</h3>
-                <div class="rocket-preview" id="rocket-preview">🚀</div>
+                <h3>Mk-III 건틀렛 커스터마이징</h3>
+                <div class="rocket-preview" id="rocket-preview">🛸</div>
                 <div class="color-options">
                     <button class="color-btn" data-color="hue-rotate(0deg)" style="background: #e74c3c; border-color: #e74c3c;"></button>
                     <button class="color-btn" data-color="hue-rotate(120deg)" style="background: #2ecc71; border-color: #2ecc71;"></button>
@@ -33,42 +29,73 @@
             </div>
 
             <div style="display: flex; gap: 1rem; flex-direction: column; width: 100%; max-width: 300px; margin: 0 auto;">
-                <button id="start-btn" class="btn primary-btn neon-btn">게임 시작!</button>
-                <button id="view-ranking-btn" class="btn secondary-btn neon-btn">🏆 랭킹 보기</button>
+                <button id="start-btn" class="btn primary-btn neon-btn">전투 시작!</button>
+                <button id="view-ranking-btn" class="btn secondary-btn neon-btn">🏆 명예의 전당</button>
             </div>
         </div>
 
         <!-- Game Screen -->
         <div id="game-screen" class="screen">
-            <div class="hud">
-                <div class="fuel-container">
-                    <div class="fuel-label">연료 <span id="time-left-text">15.0</span>s</div>
-                    <div class="fuel-bar-bg">
-                        <div id="fuel-bar" class="fuel-bar-fill"></div>
+            <!-- Top HUD -->
+            <div class="top-hud">
+                <div class="small-title">구구단 마스터 🚀🚀</div>
+                <div class="boss-hp-container">
+                    <div class="boss-name">사이보그 네뷸라 몬스터</div>
+                    <div class="hp-bar-bg">
+                        <div id="boss-hp-bar" class="hp-bar-fill"></div>
+                    </div>
+                    <div class="hp-text"><span id="boss-hp-text">100</span>%</div>
+                </div>
+            </div>
+            
+            <!-- Battle Arena -->
+            <div class="battle-arena" id="battle-arena">
+                <div class="player-container">
+                    <span id="player-rocket-emoji" class="ship-emoji">🛸</span>
+                </div>
+                <div class="laser-beam" id="laser-beam"></div>
+                <div class="boss-container" id="boss-monster">
+                    <span class="boss-emoji">👾</span>
+                </div>
+            </div>
+            
+            <!-- Bottom HUD -->
+            <div class="bottom-hud">
+                <div class="hologram-board">
+                    <div id="question" class="question">2 × 3 = ?</div>
+                    
+                    <div class="options-container">
+                        <button class="option-btn hologram-btn">1</button>
+                        <button class="option-btn hologram-btn">2</button>
+                        <button class="option-btn hologram-btn">3</button>
+                        <button class="option-btn hologram-btn">4</button>
                     </div>
                 </div>
-                <div class="stats-container">
-                    <div class="combo" id="combo-display">콤보: x0</div>
-                    <div class="score">점수: <span id="score">0</span></div>
+
+                <div class="status-hud">
+                    <div class="fuel-container">
+                        <div class="fuel-label">My Fuel <span id="time-left-text">15.0</span>s</div>
+                        <div class="fuel-bar-bg">
+                            <div id="fuel-bar" class="fuel-bar-fill"></div>
+                        </div>
+                    </div>
+                    <div class="combo-score">
+                        <div class="combo" id="combo-display">Combo: x0</div>
+                        <div class="score" style="display: none;">Score: <span id="score">0</span></div>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="racing-track" id="racing-track">
-                <!-- Opponent rockets will be injected here -->
-                <div class="player-rocket" id="player-rocket">
-                    <span id="player-rocket-emoji">🚀</span>
-                    <div class="booster" id="player-booster"></div>
-                </div>
-            </div>
-            
-            <div class="hologram-board">
-                <div id="question" class="question">2 × 3 = ?</div>
                 
-                <div class="options-container">
-                    <button class="option-btn hologram-btn">1</button>
-                    <button class="option-btn hologram-btn">2</button>
-                    <button class="option-btn hologram-btn">3</button>
-                    <button class="option-btn hologram-btn">4</button>
+                <div class="skill-bar">
+                    <button class="skill-btn" id="skill-time" disabled>
+                        <span class="skill-icon">⏳</span>
+                        <span class="skill-name">Time Dilation</span>
+                        <span class="skill-req">3 Combo</span>
+                    </button>
+                    <button class="skill-btn" id="skill-shield" disabled>
+                        <span class="skill-icon">🛡️</span>
+                        <span class="skill-name">Force Field</span>
+                        <span class="skill-req">5 Combo</span>
+                    </button>
                 </div>
             </div>
             
@@ -77,29 +104,27 @@
 
         <!-- Result Screen -->
         <div id="result-screen" class="screen">
-            <h2 class="neon-text text-danger">연료 소진! ⛽</h2>
-            <div class="final-score hologram-box">최종 비행 점수: <span id="final-score">0</span>점</div>
-            <div id="rating" class="rating neon-text">대단해요! 🌟</div>
+            <h2 id="result-title" class="neon-text"></h2>
+            <div class="final-score hologram-box">전투 점수: <span id="final-score">0</span>점</div>
+            <div id="rating" class="rating neon-text"></div>
             
             <div class="ranking-container hologram-box">
-                <h3 class="neon-text">🏆 실시간 랭킹 (Top 5) 🏆</h3>
+                <h3 class="neon-text">🏆 전투 랭킹 (Top 5) 🏆</h3>
                 <ul id="ranking-list" class="ranking-list">
-                    <!-- 랭킹 항목이 여기에 추가됩니다 -->
                 </ul>
             </div>
 
             <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
-                <button id="restart-btn" class="btn primary-btn neon-btn">다시 비행하기</button>
+                <button id="restart-btn" class="btn primary-btn neon-btn">다시 도전하기</button>
                 <button id="go-home-btn" class="btn secondary-btn neon-btn">처음으로</button>
             </div>
         </div>
 
         <!-- Ranking Screen -->
         <div id="ranking-screen" class="screen">
-            <h2 class="neon-text">🏆 명예의 전당 🏆</h2>
+            <h2 class="neon-text">🏆 전투 명예의 전당 🏆</h2>
             <div class="ranking-container hologram-box">
                 <ul id="main-ranking-list" class="ranking-list">
-                    <!-- 랭킹 항목이 여기에 추가됩니다 -->
                 </ul>
             </div>
             <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">

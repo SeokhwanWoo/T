@@ -26,21 +26,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const rocketPreview = document.getElementById('rocket-preview');
     const playerRocketEmoji = document.getElementById('player-rocket-emoji');
+    const bossMonster = document.getElementById('boss-monster');
+    const laserBeam = document.getElementById('laser-beam');
     const colorBtns = document.querySelectorAll('.color-btn');
-    const racingTrack = document.getElementById('racing-track');
+
+    const bossHpBar = document.getElementById('boss-hp-bar');
+    const bossHpText = document.getElementById('boss-hp-text');
+
+    const skillTime = document.getElementById('skill-time');
+    const skillShield = document.getElementById('skill-shield');
 
     // Game Variables
     let score = 0;
     let combo = 0;
     let maxTime = 15;
     let timeLeft = maxTime;
+    let maxBossHp = 300;
+    let bossHp = maxBossHp;
     let timerInterval;
     let currentAnswer = 0;
     let currentQuestionScore = 10;
     let isPlaying = false;
+    let timeDilationActive = false;
+    let shieldActive = false;
+
     let rocketColor = localStorage.getItem('gugudanRocketColor') || 'hue-rotate(0deg)';
     let rankings = JSON.parse(localStorage.getItem('gugudanRankings')) || [];
-    let ghostRocketsData = [];
 
     // Initialize Customizer
     initCustomizer();
@@ -64,6 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => handleAnswer(btn));
     });
 
+    skillTime.addEventListener('click', activateTimeDilation);
+    skillShield.addEventListener('click', activateShield);
+
     // Customizer Logic
     function initCustomizer() {
         applyRocketColor(rocketColor);
@@ -81,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyRocketColor(color) {
         rocketPreview.style.filter = color;
-        playerRocketEmoji.style.filter = color;
+        playerRocketEmoji.style.filter = `${color} drop-shadow(0 0 10px cyan)`;
     }
 
     // Game Functions
@@ -89,77 +103,30 @@ document.addEventListener('DOMContentLoaded', () => {
         score = 0;
         combo = 0;
         timeLeft = maxTime;
+        bossHp = maxBossHp;
         isPlaying = true;
+        timeDilationActive = false;
+        shieldActive = false;
         
         updateScore();
         updateCombo();
         updateFuel();
-        spawnGhostRockets();
+        updateBossHp();
+        updateSkills();
         
         showScreen(gameScreen);
         generateQuestion();
         
         timerInterval = setInterval(() => {
-            timeLeft -= 0.1; // 100ms interval
+            // Time dilation reduces fuel burn rate by half
+            let burnRate = timeDilationActive ? 0.05 : 0.1;
+            timeLeft -= burnRate; 
             updateFuel();
             
             if (timeLeft <= 0) {
-                endGame();
+                endGame(false); // Lost by timeout
             }
         }, 100);
-    }
-
-    function spawnGhostRockets() {
-        // Clear previous ghosts
-        document.querySelectorAll('.ghost-rocket').forEach(el => el.remove());
-        ghostRocketsData = [];
-        
-        // Use top rankings as ghosts, or dummy if none
-        let targets = rankings.slice(0, 3);
-        if (targets.length === 0) {
-            targets = [
-                { name: '초보 우주인', score: 100 },
-                { name: '베테랑', score: 300 },
-                { name: '우주 괴물', score: 600 }
-            ];
-        }
-
-        targets.forEach((target, i) => {
-            const el = document.createElement('div');
-            el.className = 'ghost-rocket';
-            // Spread them horizontally
-            const leftPos = 20 + (i * 30); // 20%, 50%, 80%
-            el.style.left = `${leftPos}%`;
-            el.innerHTML = `<span>🚀</span><div class="ghost-name">${target.name}</div>`;
-            racingTrack.appendChild(el);
-            
-            ghostRocketsData.push({
-                element: el,
-                targetScore: target.score,
-                initialBottom: 20 + (i * 20) // Initial position higher than player
-            });
-        });
-        updateRacingTrack();
-    }
-
-    function updateRacingTrack() {
-        ghostRocketsData.forEach(ghost => {
-            // Calculate relative position based on score difference
-            // If player score matches ghost score, ghost should be at player level (20%)
-            // If player is lower, ghost is higher.
-            const diff = ghost.targetScore - score;
-            let visualPos = 20;
-            
-            if (diff > 0) {
-                // Ghost is ahead
-                visualPos = 20 + Math.min(60, (diff / 5)); 
-            } else {
-                // Player passed the ghost (ghost falls behind)
-                visualPos = 20 + (diff / 2);
-            }
-            
-            ghost.element.style.bottom = `${Math.max(-20, visualPos)}%`;
-        });
     }
 
     function generateQuestion() {
@@ -170,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const num2 = Math.floor(Math.random() * 8) + 2;
         currentAnswer = num1 * num2;
         
-        // Difficulty scoring (Adjusted for 9-dan)
+        // Difficulty scoring
         if (num1 >= 7 && num2 >= 7) currentQuestionScore = 30;
         else if (num1 >= 7 || num2 >= 7) currentQuestionScore = 20;
         else currentQuestionScore = 10;
@@ -210,35 +177,101 @@ document.addEventListener('DOMContentLoaded', () => {
             const comboMultiplier = 1 + (combo * 0.1);
             const gainedScore = Math.floor(currentQuestionScore * comboMultiplier);
             score += gainedScore;
+            bossHp -= gainedScore;
             
             updateScore();
             updateCombo();
-            updateRacingTrack();
+            updateBossHp();
+            updateSkills();
             
             btn.classList.add('correct');
             
-            // Visual Effects
-            document.getElementById('player-rocket').classList.add('hyperdrive');
-            setTimeout(() => document.getElementById('player-rocket').classList.remove('hyperdrive'), 300);
+            // Fire Laser!
+            laserBeam.classList.add('laser-fire');
+            setTimeout(() => {
+                bossMonster.classList.add('boss-hit');
+            }, 100);
             
-            showFeedback(`정답! 👏 +${gainedScore}점`, 'correct');
-            setTimeout(generateQuestion, 400);
+            setTimeout(() => {
+                laserBeam.classList.remove('laser-fire');
+                bossMonster.classList.remove('boss-hit');
+            }, 300);
+            
+            showFeedback(`명중! 💥 +${gainedScore} 대미지`, 'correct');
+            
+            if (bossHp <= 0) {
+                setTimeout(() => endGame(true), 500); // Win
+            } else {
+                setTimeout(generateQuestion, 400);
+            }
         } else {
             // Wrong
             combo = 0;
             updateCombo();
+            updateSkills();
             
             btn.classList.add('wrong');
-            appContainer.classList.add('shake');
-            setTimeout(() => appContainer.classList.remove('shake'), 400);
+            
+            if (shieldActive) {
+                showFeedback('방어막 가동! 피해 무효화 🛡️', 'correct');
+                shieldActive = false;
+                skillShield.classList.remove('skill-active');
+            } else {
+                appContainer.classList.add('shake-heavy');
+                playerRocketEmoji.classList.add('ship-hit');
+                timeLeft -= 2; // Penalty
+                updateFuel();
+                showFeedback('피격! 연료 -2초 ⚠️', 'wrong');
+                
+                setTimeout(() => {
+                    appContainer.classList.remove('shake-heavy');
+                    playerRocketEmoji.classList.remove('ship-hit');
+                }, 500);
+                
+                if (timeLeft <= 0) {
+                    setTimeout(() => endGame(false), 500);
+                    return;
+                }
+            }
             
             optionBtns.forEach(b => {
                 if (parseInt(b.textContent) === currentAnswer) b.classList.add('correct');
             });
             
-            showFeedback('오답! 💥 운석 충돌!', 'wrong');
             setTimeout(generateQuestion, 800);
         }
+    }
+
+    function activateTimeDilation() {
+        if (combo >= 3 && !timeDilationActive) {
+            combo -= 3;
+            updateCombo();
+            updateSkills();
+            timeDilationActive = true;
+            skillTime.classList.add('skill-active');
+            showFeedback('시간 지연 가동! ⏳', 'correct');
+            
+            setTimeout(() => {
+                timeDilationActive = false;
+                skillTime.classList.remove('skill-active');
+            }, 3000); // lasts 3 seconds
+        }
+    }
+
+    function activateShield() {
+        if (combo >= 5 && !shieldActive) {
+            combo -= 5;
+            updateCombo();
+            updateSkills();
+            shieldActive = true;
+            skillShield.classList.add('skill-active');
+            showFeedback('포스 필드 전개! 🛡️', 'correct');
+        }
+    }
+
+    function updateSkills() {
+        skillTime.disabled = combo < 3 || timeDilationActive;
+        skillShield.disabled = combo < 5 || shieldActive;
     }
 
     function updateScore() {
@@ -246,16 +279,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateCombo() {
-        comboDisplay.textContent = `콤보: x${combo}`;
+        comboDisplay.textContent = `Combo: x${combo}`;
         if (combo > 1) {
             comboDisplay.classList.add('pop');
             setTimeout(() => comboDisplay.classList.remove('pop'), 200);
-            comboDisplay.style.color = '#f1c40f'; // Yellow
+            comboDisplay.style.color = '#f1c40f';
         } else {
             comboDisplay.style.color = '#fff';
         }
-        
-        if(combo >= 5) comboDisplay.style.color = '#e74c3c'; // Red for high combo
+        if(combo >= 5) comboDisplay.style.color = '#e74c3c';
     }
 
     function updateFuel() {
@@ -264,11 +296,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const percentage = (timeLeft / maxTime) * 100;
         fuelBar.style.width = `${percentage}%`;
         
-        if (percentage <= 20) {
-            fuelBar.style.background = '#e74c3c';
-        } else {
-            fuelBar.style.background = 'linear-gradient(90deg, #f1c40f, #e74c3c)';
-        }
+        if (percentage <= 20) fuelBar.style.background = '#e74c3c';
+        else fuelBar.style.background = 'linear-gradient(90deg, #f1c40f, #e74c3c)';
+    }
+
+    function updateBossHp() {
+        if (bossHp < 0) bossHp = 0;
+        const percentage = (bossHp / maxBossHp) * 100;
+        bossHpBar.style.width = `${percentage}%`;
+        bossHpText.textContent = Math.ceil(percentage);
     }
 
     function showFeedback(text, type) {
@@ -276,16 +312,22 @@ document.addEventListener('DOMContentLoaded', () => {
         feedbackEl.className = `feedback show ${type}`;
     }
 
-    function endGame() {
+    function endGame(isWin) {
         isPlaying = false;
         clearInterval(timerInterval);
         
         finalScoreEl.textContent = score;
+        const resultTitle = document.getElementById('result-title');
         
-        if (score >= 1000) ratingEl.textContent = '빛의 속도! 전설의 로켓 🚀✨';
-        else if (score >= 500) ratingEl.textContent = '대단해요! 은하계 탐험가 🌌';
-        else if (score >= 200) ratingEl.textContent = '참 잘했어요! 달 착륙 성공 🌕';
-        else ratingEl.textContent = '더 높이 날 수 있어요! 연료 보충 필요 ⛽';
+        if (isWin) {
+            resultTitle.textContent = "보스 격파 성공! 🏆";
+            resultTitle.className = "neon-text";
+            ratingEl.textContent = '은하계를 구한 영웅! ✨';
+        } else {
+            resultTitle.textContent = "연료 소진... 패배 💀";
+            resultTitle.className = "neon-text text-danger";
+            ratingEl.textContent = '아쉽습니다. 재정비 후 도전하세요! 🔧';
+        }
         
         showScreen(resultScreen);
         saveAndShowRanking(score);
@@ -294,10 +336,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function saveAndShowRanking(newScore) {
         if (newScore > 0) {
             setTimeout(() => {
-                let name = prompt("우주 여행 종료! 랭킹에 등록할 조종사 이름을 입력하세요:", "파일럿");
+                let name = prompt("전투 기록 완료! 조종사 이름을 입력하세요:", "파일럿");
                 if (!name || name.trim() === "") name = "익명";
                 
-                rankings.push({ name: name.trim(), score: newScore });
+                rankings.push({ name: name.trim(), score: newScore, date: new Date().toLocaleDateString() });
                 rankings.sort((a, b) => b.score - a.score);
                 rankings = rankings.slice(0, 5);
                 localStorage.setItem('gugudanRankings', JSON.stringify(rankings));
@@ -316,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!element) return;
             element.innerHTML = '';
             if (rankings.length === 0) {
-                element.innerHTML = '<li style="justify-content:center; color:#999;">비행 기록이 없습니다.</li>';
+                element.innerHTML = '<li style="justify-content:center; color:#999;">전투 기록이 없습니다.</li>';
                 return;
             }
 
