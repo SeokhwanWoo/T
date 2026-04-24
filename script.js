@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const upgSpdLevel = document.getElementById('upg-spd-level');
     const upgSpdCost = document.getElementById('upg-spd-cost');
     const buySpdBtn = document.getElementById('buy-spd-btn');
+    const upgFirerateLevel = document.getElementById('upg-firerate-level');
+    const upgFirerateCost = document.getElementById('upg-firerate-cost');
+    const buyFirerateBtn = document.getElementById('buy-firerate-btn');
 
     // Customizer Elements
     const rocketPreview = document.getElementById('rocket-preview');
@@ -57,6 +60,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Game State ---
+    let gameWidth = window.innerWidth;
+    let gameHeight = window.innerHeight;
+    const bgCanvas = document.getElementById('bg-canvas');
+    const ctx = bgCanvas.getContext('2d');
+    let stars = [];
+
+    window.addEventListener('resize', () => {
+        gameWidth = window.innerWidth;
+        gameHeight = window.innerHeight;
+        bgCanvas.width = gameWidth;
+        bgCanvas.height = gameHeight;
+        
+        if (player.x > gameWidth) player.x = gameWidth - 20;
+        if (player.y > gameHeight) player.y = gameHeight - 20;
+    });
+    // Set initial size
+    bgCanvas.width = gameWidth;
+    bgCanvas.height = gameHeight;
+
     let animationFrameId;
     let isPlaying = false;
     let isPaused = false;
@@ -68,20 +90,31 @@ document.addEventListener('DOMContentLoaded', () => {
     let rocketColor = localStorage.getItem('spaceRaidRocketColor') || 'hue-rotate(0deg)';
     
     let totalCredits = parseInt(localStorage.getItem('spaceRaidCredits')) || 0;
-    let persistentUpgrades = JSON.parse(localStorage.getItem('spaceRaidUpgrades')) || { damage: 0, speed: 0 };
+    let persistentUpgrades = JSON.parse(localStorage.getItem('spaceRaidUpgrades')) || { damage: 0, speed: 0, fireRate: 0 };
+    if (persistentUpgrades.fireRate === undefined) persistentUpgrades.fireRate = 0;
 
     const player = {
-        x: 50, y: 50,
-        speed: 30, // % per second
+        x: gameWidth / 2, y: gameHeight / 2,
+        speed: 300, // px per second
         hp: 100, maxHp: 100,
         level: 1, exp: 0, maxExp: 10,
         damage: 20, 
         ultGauge: 0,
-        magnetRange: 15,
-        isHit: false
+        magnetRange: 150, // px
+        isHit: false,
+        fireRate: 500,
+        fireTimer: 0,
+        multishotLevel: 0,
+        piercingLevel: 0,
+        hasDrone: false
     };
 
-    const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+    const TRACKED_KEYS = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ']);
+    const keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowdown: false, arrowleft: false, arrowright: false };
+
+    function resetAllKeys() {
+        for (const k in keys) keys[k] = false;
+    }
     const joystickVector = { x: 0, y: 0 };
     let joystickActive = false;
     let joystickTouchId = null;
@@ -92,6 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let bullets = [];
     let enemyBullets = [];
     let gems = [];
+    let drones = [];
+    let mousePos = { x: gameWidth / 2, y: gameHeight / 4 }; 
     
     let enemySpawnTimer = 0;
     let enemySpawnInterval = 1500;
@@ -122,21 +157,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     buyDmgBtn.addEventListener('click', () => buyPersistentUpgrade('damage', 500));
     buySpdBtn.addEventListener('click', () => buyPersistentUpgrade('speed', 500));
+    buyFirerateBtn.addEventListener('click', () => buyPersistentUpgrade('fireRate', 500));
 
     window.addEventListener('keydown', (e) => {
-        if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
-        // Shift key ultimate removed (Auto now)
+        const key = e.key.toLowerCase();
+        if (TRACKED_KEYS.has(key)) {
+            e.preventDefault(); // 스페이스/화살표 키로 인한 스크롤 방지
+            keys[key] = true;
+            if (key === ' ' && player.ultGauge >= 100 && isPlaying && !isPaused) {
+                checkUltimate();
+            }
+        }
     });
     window.addEventListener('keyup', (e) => {
-        if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+        const key = e.key.toLowerCase();
+        if (TRACKED_KEYS.has(key)) {
+            keys[key] = false;
+        }
+    });
+    // 포커스 이탈 시 모든 키 상태 초기화 (키 씹힘 방지)
+    window.addEventListener('blur', () => {
+        resetAllKeys();
     });
 
-    // Arena click for missing
-    battleArena.addEventListener('pointerdown', (e) => {
-        if (!isPlaying || isPaused) return;
-        if (e.target === battleArena) {
-            // Clicked empty space
-            fireLaserAtCoord(player.x + 10, player.y); // just shoot forward
+    // 마우스 커서 추적 (자동 사격 목표점)
+    battleArena.addEventListener('pointermove', (e) => {
+        if (!joystickActive) {
+            const rect = battleArena.getBoundingClientRect();
+            mousePos.x = e.clientX - rect.left;
+            mousePos.y = e.clientY - rect.top;
         }
     });
 
@@ -235,6 +284,11 @@ document.addEventListener('DOMContentLoaded', () => {
         upgSpdCost.textContent = spdCost;
         buySpdBtn.disabled = totalCredits < spdCost;
         
+        const firerateCost = 500 + (persistentUpgrades.fireRate * 300);
+        upgFirerateLevel.textContent = persistentUpgrades.fireRate;
+        upgFirerateCost.textContent = firerateCost;
+        buyFirerateBtn.disabled = totalCredits < firerateCost;
+        
         localStorage.setItem('spaceRaidCredits', totalCredits);
         localStorage.setItem('spaceRaidUpgrades', JSON.stringify(persistentUpgrades));
     }
@@ -251,15 +305,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Game Engine ---
     function startGame() {
         // Reset State
-        player.x = 50; player.y = 50;
+        player.x = gameWidth / 2; player.y = gameHeight / 2;
         player.hp = player.maxHp = 100;
         player.level = 1; player.exp = 0; player.maxExp = 10;
         
         // Apply persistent upgrades to base stats
         player.damage = 20 + (persistentUpgrades.damage * 5);
-        player.speed = 30 + (persistentUpgrades.speed * 5);
+        player.speed = 300 + (persistentUpgrades.speed * 50);
+        player.fireRate = Math.max(100, 500 - (persistentUpgrades.fireRate * 30)); // 최소 100ms
         
-        player.ultGauge = 0; player.magnetRange = 15;
+        player.ultGauge = 0; player.magnetRange = 150;
+        player.fireTimer = 0; player.multishotLevel = 0; player.piercingLevel = 0; player.hasDrone = false;
         
         score = 0;
         enemySpawnInterval = 1500;
@@ -267,8 +323,23 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBoss = null;
         
         // Clear DOM entities
-        battleArena.querySelectorAll('.enemy, .boss-enemy, .gem, .bullet, .enemy-bullet, .particle, .floating-dmg, .ult-laser').forEach(e => e.remove());
-        enemies = []; bullets = []; enemyBullets = []; gems = [];
+        battleArena.querySelectorAll('.enemy, .boss-enemy, .gem, .bullet, .enemy-bullet, .particle, .floating-dmg, .ult-laser, .drone, .drone-bullet, .massive-explosion').forEach(e => e.remove());
+        enemies = []; bullets = []; enemyBullets = []; gems = []; drones = [];
+        
+        // Init Stars for Parallax
+        stars = [];
+        for (let i = 0; i < 150; i++) {
+            const layer = Math.random();
+            let size, speed, color;
+            if (layer < 0.6) { size = 1; speed = 20; color = '#555'; } // Far
+            else if (layer < 0.9) { size = 2; speed = 50; color = '#aaa'; } // Mid
+            else { size = 3; speed = 100; color = '#fff'; } // Near
+            stars.push({
+                x: Math.random() * gameWidth,
+                y: Math.random() * gameHeight,
+                size, speed, color
+            });
+        }
         
         updateHUD();
         bossHpContainer.style.display = 'none';
@@ -282,6 +353,20 @@ document.addEventListener('DOMContentLoaded', () => {
         animationFrameId = requestAnimationFrame(gameLoop);
     }
 
+    function drawStarfield(dt) {
+        ctx.clearRect(0, 0, gameWidth, gameHeight);
+        const dtSec = dt / 1000;
+        stars.forEach(s => {
+            s.y += s.speed * dtSec;
+            if (s.y > gameHeight) {
+                s.y = 0;
+                s.x = Math.random() * gameWidth;
+            }
+            ctx.fillStyle = s.color;
+            ctx.fillRect(s.x, s.y, s.size, s.size);
+        });
+    }
+
     function gameLoop(timestamp) {
         if (!isPlaying) return;
         
@@ -290,6 +375,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!isPaused) {
             updatePlayer(deltaTime);
+            updateCombat(deltaTime);
+            if (player.hasDrone) updateDrones(deltaTime);
             updateEnemies(deltaTime, timestamp);
             updateBullets(deltaTime);
             updateGems(deltaTime);
@@ -297,6 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
             checkBossSpawn();
         }
 
+        drawStarfield(deltaTime);
         render();
         animationFrameId = requestAnimationFrame(gameLoop);
     }
@@ -306,48 +394,111 @@ document.addEventListener('DOMContentLoaded', () => {
         const dtSec = dt / 1000;
         let dx = 0; let dy = 0;
         
-        // Keyboard input
-        if (keys.w || keys.ArrowUp) dy -= 1;
-        if (keys.s || keys.ArrowDown) dy += 1;
-        if (keys.a || keys.ArrowLeft) dx -= 1;
-        if (keys.d || keys.ArrowRight) dx += 1;
+        // 키보드 입력 (매 프레임 keys 상태 객체를 읽어 이동 계산)
+        if (keys.w || keys.arrowup)    dy -= 1;
+        if (keys.s || keys.arrowdown)  dy += 1;
+        if (keys.a || keys.arrowleft)  dx -= 1;
+        if (keys.d || keys.arrowright) dx += 1;
         
-        // Normalize keyboard diagonal
-        if (dx !== 0 && dy !== 0) {
-            dx *= 0.707; dy *= 0.707;
+        // 대각선 이동 속도 보정: 벡터 정규화 (√2 ≈ 1.414 방지)
+        const kbMag = Math.sqrt(dx * dx + dy * dy);
+        if (kbMag > 0) {
+            dx /= kbMag;
+            dy /= kbMag;
         }
 
-        // Add joystick input
-        dx += joystickVector.x;
-        dy += joystickVector.y;
+        // 조이스틱 입력 합산 (이미 단위벡터 범위로 정규화된 값)
+        if (joystickActive) {
+            dx += joystickVector.x;
+            dy += joystickVector.y;
+        }
         
-        // Clamp total magnitude to max 1
-        const totalMag = Math.sqrt(dx*dx + dy*dy);
+        // 키보드+조이스틱 동시 입력 시 최대 크기 1로 클램프
+        const totalMag = Math.sqrt(dx * dx + dy * dy);
         if (totalMag > 1) {
-            dx /= totalMag; dy /= totalMag;
+            dx /= totalMag;
+            dy /= totalMag;
         }
 
         player.x += dx * player.speed * dtSec;
         player.y += dy * player.speed * dtSec;
         
-        if (player.x < 5) player.x = 5; if (player.x > 95) player.x = 95;
-        if (player.y < 5) player.y = 5; if (player.y > 95) player.y = 95;
+        if (player.x < 0)  player.x = 0;
+        if (player.x > gameWidth) player.x = gameWidth;
+        if (player.y < 0)  player.y = 0;
+        if (player.y > gameHeight) player.y = gameHeight;
     }
 
-    // Manual firing based on click
-    function fireLaserAtTarget(target) {
-        if (!isPlaying || isPaused) return;
+    function updateCombat(dt) {
+        player.fireTimer += dt;
         
-        const dx = target.x - player.x;
-        const dy = target.y - player.y;
-        const length = Math.sqrt(dx*dx + dy*dy);
+        // 조이스틱 사용 중이거나 모바일일 경우 가장 가까운 적 방향으로 자동 조준
+        if (joystickActive && enemies.length > 0) {
+            let closest = enemies[0];
+            let minDist = getDistance(player.x, player.y, closest.x, closest.y);
+            for (let i = 1; i < enemies.length; i++) {
+                let dist = getDistance(player.x, player.y, enemies[i].x, enemies[i].y);
+                if (dist < minDist) { minDist = dist; closest = enemies[i]; }
+            }
+            if (bossActive && currentBoss) {
+                let dist = getDistance(player.x, player.y, currentBoss.x, currentBoss.y);
+                if (dist < minDist) { minDist = dist; closest = currentBoss; }
+            }
+            mousePos.x = closest.x;
+            mousePos.y = closest.y;
+        }
+
+        if (player.fireTimer >= player.fireRate) {
+            player.fireTimer = 0;
+            fireLaserAtCoord(mousePos.x, mousePos.y);
+        }
+    }
+
+    let droneAngle = 0;
+    function updateDrones(dt) {
+        const dtSec = dt / 1000;
+        droneAngle += dtSec * 3; 
         
-        if (length === 0) return;
-        
-        const vx = (dx / length) * 150; 
-        const vy = (dy / length) * 150;
-        
-        createBullet(player.x, player.y, vx, vy, false);
+        drones.forEach((d, i) => {
+            const angleOffset = (Math.PI * 2 / drones.length) * i;
+            const targetX = player.x + Math.cos(droneAngle + angleOffset) * 60;
+            const targetY = player.y + Math.sin(droneAngle + angleOffset) * 60;
+            
+            d.x += (targetX - d.x) * 5 * dtSec;
+            d.y += (targetY - d.y) * 5 * dtSec;
+            d.el.style.left = `${d.x}px`;
+            d.el.style.top = `${d.y}px`;
+            
+            d.fireTimer += dt;
+            if (d.fireTimer >= 800) {
+                d.fireTimer = 0;
+                let targets = [...enemies];
+                if (bossActive && currentBoss) targets.push(currentBoss);
+                if (targets.length > 0) {
+                    let closest = targets[0];
+                    let minDist = getDistance(d.x, d.y, closest.x, closest.y);
+                    for (let j = 1; j < targets.length; j++) {
+                        let dist = getDistance(d.x, d.y, targets[j].x, targets[j].y);
+                        if (dist < minDist) { minDist = dist; closest = targets[j]; }
+                    }
+                    if (minDist < 300) {
+                        const dx = closest.x - d.x;
+                        const dy = closest.y - d.y;
+                        const len = Math.sqrt(dx*dx + dy*dy);
+                        const vx = (dx / len) * 600;
+                        const vy = (dy / len) * 600;
+                        createDroneBullet(d.x, d.y, vx, vy);
+                    }
+                }
+            }
+        });
+    }
+
+    function createDroneBullet(x, y, vx, vy) {
+        const el = document.createElement('div');
+        el.className = 'drone-bullet';
+        battleArena.appendChild(el);
+        bullets.push({ id: Math.random(), x, y, vx, vy, el, isEnemy: false, damageMult: 0.5, hitSet: null, pierceCount: 0 });
         playSound('shoot');
     }
 
@@ -355,9 +506,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const dx = tx - player.x;
         const dy = ty - player.y;
         const length = Math.sqrt(dx*dx + dy*dy);
-        const vx = (dx / length) * 150; 
-        const vy = (dy / length) * 150;
-        createBullet(player.x, player.y, vx, vy, false);
+        if (length === 0) return;
+
+        const baseAngle = Math.atan2(dy, dx);
+        const speed = 800; // px/s
+        
+        let angles = [baseAngle];
+        if (player.multishotLevel === 1) angles = [baseAngle - 0.1, baseAngle + 0.1];
+        else if (player.multishotLevel >= 2) angles = [baseAngle - 0.2, baseAngle, baseAngle + 0.2];
+        
+        angles.forEach(angle => {
+            const vx = Math.cos(angle) * speed; 
+            const vy = Math.sin(angle) * speed;
+            createBullet(player.x, player.y, vx, vy, false);
+        });
         playSound('shoot');
     }
 
@@ -371,8 +533,12 @@ document.addEventListener('DOMContentLoaded', () => {
             el.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
         }
 
+        const isPiercing = !isEnemy && player.piercingLevel > 0;
+        const hitSet = isPiercing ? new Set() : null;
+        const pierceCount = isPiercing ? player.piercingLevel : 0;
+
         const list = isEnemy ? enemyBullets : bullets;
-        list.push({ id: Math.random(), x, y, vx, vy, el, isEnemy });
+        list.push({ id: Math.random(), x, y, vx, vy, el, isEnemy, damageMult: 1, hitSet, pierceCount });
     }
 
     function updateBullets(dt) {
@@ -383,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 b.x += b.vx * dtSec;
                 b.y += b.vy * dtSec;
                 
-                if (b.x < -10 || b.x > 110 || b.y < -10 || b.y > 110) {
+                if (b.x < -50 || b.x > gameWidth + 50 || b.y < -50 || b.y > gameHeight + 50) {
                     b.el.remove();
                     list.splice(i, 1);
                 }
@@ -415,7 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const dx = player.x - currentBoss.x;
             const dy = player.y - currentBoss.y;
             const len = Math.sqrt(dx*dx + dy*dy);
-            if (len > 20) {
+            if (len > 100) {
                 currentBoss.x += (dx/len) * currentBoss.speed * dtSec;
                 currentBoss.y += (dy/len) * currentBoss.speed * dtSec;
             }
@@ -434,34 +600,27 @@ document.addEventListener('DOMContentLoaded', () => {
         el.className = 'enemy';
         el.textContent = chars[Math.floor(Math.random() * chars.length)];
         
-        // Manual click targeting
-        el.addEventListener('pointerdown', (evt) => {
-            evt.stopPropagation();
-            if (!isPlaying || isPaused) return;
-            const target = enemies.find(e => e.el === el);
-            if (target) fireLaserAtTarget(target);
-        });
-
+        // 클릭 이벤트 제거 (자동 사격)
         battleArena.appendChild(el);
         
         let x, y;
         if (Math.random() > 0.5) {
-            x = Math.random() > 0.5 ? -5 : 105;
-            y = Math.random() * 100;
+            x = Math.random() > 0.5 ? -50 : gameWidth + 50;
+            y = Math.random() * gameHeight;
         } else {
-            x = Math.random() * 100;
-            y = Math.random() > 0.5 ? -5 : 105;
+            x = Math.random() * gameWidth;
+            y = Math.random() > 0.5 ? -50 : gameHeight + 50;
         }
 
-        enemies.push({ x, y, hp: 40 + (player.level * 10), maxHp: 40 + (player.level * 10), speed: 10 + Math.random() * 10, el });
+        enemies.push({ x, y, hp: 40 + (player.level * 10), maxHp: 40 + (player.level * 10), speed: 50 + Math.random() * 50, el });
     }
 
     function fireBossBulletHell() {
         playSound('shoot');
         for (let i = 0; i < 8; i++) {
             const angle = (Math.PI / 4) * i;
-            const vx = Math.cos(angle) * 40;
-            const vy = Math.sin(angle) * 40;
+            const vx = Math.cos(angle) * 300;
+            const vy = Math.sin(angle) * 300;
             createBullet(currentBoss.x, currentBoss.y, vx, vy, true);
         }
     }
@@ -475,10 +634,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (dist < player.magnetRange) {
                 const dx = player.x - g.x;
                 const dy = player.y - g.y;
-                g.x += (dx/dist) * 60 * dtSec;
-                g.y += (dy/dist) * 60 * dtSec;
+                g.x += (dx/dist) * 300 * dtSec;
+                g.y += (dy/dist) * 300 * dtSec;
                 
-                if (dist < 3) {
+                if (dist < 15) {
                     g.el.remove();
                     gems.splice(i, 1);
                     gainExp(1);
@@ -494,33 +653,43 @@ document.addEventListener('DOMContentLoaded', () => {
             const b = bullets[i];
             let hit = false;
             
-            if (bossActive && currentBoss && getDistance(b.x, b.y, currentBoss.x, currentBoss.y) < 8) {
-                damageBoss(player.damage, b.x, b.y);
-                hit = true;
+            if (bossActive && currentBoss && getDistance(b.x, b.y, currentBoss.x, currentBoss.y) < 40) {
+                if (!b.hitSet || !b.hitSet.has(currentBoss)) {
+                    damageBoss(player.damage * b.damageMult, b.x, b.y);
+                    hit = true;
+                    if (b.hitSet) b.hitSet.add(currentBoss);
+                }
             }
 
             if (!hit) {
                 for (let j = enemies.length - 1; j >= 0; j--) {
                     const e = enemies[j];
-                    if (getDistance(b.x, b.y, e.x, e.y) < 5) {
-                        damageEnemy(j, player.damage, b.x, b.y);
-                        hit = true;
-                        break;
+                    if (getDistance(b.x, b.y, e.x, e.y) < 25) {
+                        if (!b.hitSet || !b.hitSet.has(e)) {
+                            damageEnemy(j, player.damage * b.damageMult, b.x, b.y);
+                            hit = true;
+                            if (b.hitSet) b.hitSet.add(e);
+                            break;
+                        }
                     }
                 }
             }
 
             if (hit) {
                 createSpark(b.x, b.y);
-                b.el.remove();
-                bullets.splice(i, 1);
+                if (b.pierceCount > 0) {
+                    b.pierceCount--;
+                } else {
+                    b.el.remove();
+                    bullets.splice(i, 1);
+                }
             }
         }
 
         // Enemy Bullets vs Player
         for (let i = enemyBullets.length - 1; i >= 0; i--) {
             const b = enemyBullets[i];
-            if (getDistance(b.x, b.y, player.x, player.y) < 3) {
+            if (getDistance(b.x, b.y, player.x, player.y) < 15) {
                 damagePlayer(15);
                 b.el.remove();
                 enemyBullets.splice(i, 1);
@@ -529,18 +698,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Enemies vs Player
         enemies.forEach(e => {
-            if (getDistance(e.x, e.y, player.x, player.y) < 4) damagePlayer(5);
+            if (getDistance(e.x, e.y, player.x, player.y) < 20) damagePlayer(5);
         });
-        if (bossActive && currentBoss && getDistance(currentBoss.x, currentBoss.y, player.x, player.y) < 8) {
+        if (bossActive && currentBoss && getDistance(currentBoss.x, currentBoss.y, player.x, player.y) < 40) {
             damagePlayer(10);
         }
+    }
+
+    // --- Shake Helper ---
+    function triggerShake(type) {
+        appContainer.classList.remove(type);
+        void appContainer.offsetWidth; // trigger reflow
+        appContainer.classList.add(type);
+        setTimeout(() => appContainer.classList.remove(type), type === 'shake-heavy' ? 500 : 200);
     }
 
     // --- Damage & Combat ---
     function damageEnemy(index, amount, hitX, hitY) {
         const e = enemies[index];
         e.hp -= amount;
-        createFloatingText(amount, hitX, hitY, false);
+        createFloatingText(Math.ceil(amount), hitX, hitY, false);
         playSound('hit');
 
         if (e.hp <= 0) {
@@ -548,6 +725,7 @@ document.addEventListener('DOMContentLoaded', () => {
             totalCredits += 2; // Also gain credits
             addUltGauge(5);
             spawnGem(e.x, e.y);
+            createParticleExplosion(e.x, e.y);
             e.el.remove();
             enemies.splice(index, 1);
             updateHUD();
@@ -559,8 +737,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function damageBoss(amount, hitX, hitY) {
         currentBoss.hp -= amount;
-        createFloatingText(amount, hitX, hitY, true);
+        createFloatingText(Math.ceil(amount), hitX, hitY, true);
         playSound('hit');
+        triggerShake('shake-light');
         
         const percent = Math.max(0, (currentBoss.hp / currentBoss.maxHp) * 100);
         bossHpBar.style.width = `${percent}%`;
@@ -570,11 +749,12 @@ document.addEventListener('DOMContentLoaded', () => {
             totalCredits += 100;
             addUltGauge(50);
             for(let i=0; i<10; i++) spawnGem(currentBoss.x + (Math.random()*10-5), currentBoss.y + (Math.random()*10-5));
+            createParticleExplosion(currentBoss.x, currentBoss.y);
             currentBoss.el.remove();
             bossActive = false;
             currentBoss = null;
             bossHpContainer.style.display = 'none';
-            appContainer.classList.add('shake-heavy');
+            triggerShake('shake-heavy');
             playSound('explosion');
             updateHUD();
         } else {
@@ -588,7 +768,7 @@ document.addEventListener('DOMContentLoaded', () => {
         player.hp -= amount;
         player.isHit = true;
         playerRocketEmoji.classList.add('ship-hit');
-        appContainer.classList.add('shake-light');
+        triggerShake('shake-light');
         updateHUD();
         
         setTimeout(() => {
@@ -613,17 +793,11 @@ document.addEventListener('DOMContentLoaded', () => {
         el.className = 'boss-enemy';
         el.textContent = bInfo.char;
         
-        // Manual click targeting for Boss
-        el.addEventListener('pointerdown', (evt) => {
-            evt.stopPropagation();
-            if (!isPlaying || isPaused) return;
-            fireLaserAtTarget(currentBoss);
-        });
-
+        // 보스도 자동 사격 대상이므로 클릭 이벤트 제거
         battleArena.appendChild(el);
         
-        const x = 50; const y = -10;
-        currentBoss = { x, y, hp: 3000 + (player.level * 500), maxHp: 3000 + (player.level * 500), speed: 5, el, lastShot: 0 };
+        const x = gameWidth / 2; const y = -100;
+        currentBoss = { x, y, hp: 3000 + (player.level * 500), maxHp: 3000 + (player.level * 500), speed: 30, el, lastShot: 0 };
         
         bossHpContainer.style.display = 'block';
         bossHpBar.style.width = '100%';
@@ -682,16 +856,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Massive Explosion Visual
             const exp = document.createElement('div');
             exp.className = 'massive-explosion';
-            exp.style.left = `${t.x}%`;
-            exp.style.top = `${t.y}%`;
+            exp.style.left = `${t.x}px`;
+            exp.style.top = `${t.y}px`;
             battleArena.appendChild(exp);
             setTimeout(() => exp.remove(), 500);
             
             // Giant Laser
             const beam = document.createElement('div');
             beam.className = 'ult-laser';
-            beam.style.left = `${t.x}%`;
-            beam.style.top = `${t.y}%`;
+            beam.style.left = `${t.x}px`;
+            beam.style.top = `${t.y}px`;
             beam.style.width = '20px'; // Thicker
             battleArena.appendChild(beam);
             setTimeout(() => beam.remove(), 500);
@@ -719,7 +893,10 @@ document.addEventListener('DOMContentLoaded', () => {
             { id: 'dmg', name: '공격력 추가 증가', desc: '현재 전투 레이저 대미지 대폭 상승', icon: '💥' },
             { id: 'spd', name: '엔진 부스트', desc: '현재 전투 우주선 이동 속도 소폭 상승', icon: '🚀' },
             { id: 'mag', name: '자석 모듈 강화', desc: '아이템 끌어당기는 범위 확대', icon: '🧲' },
-            { id: 'hp', name: '선체 긴급 수리', desc: 'HP 30 회복', icon: '💖' }
+            { id: 'hp', name: '선체 긴급 수리', desc: 'HP 30 회복', icon: '💖' },
+            { id: 'multishot', name: '멀티 레이저', desc: '발사하는 레이저 줄기 수가 증가합니다.', icon: '🌊' },
+            { id: 'piercing', name: '관통 레이저', desc: '레이저가 적을 관통하여 타격합니다.', icon: '🏹' },
+            { id: 'drone', name: '미니 드론 소환', desc: '자동으로 주변 적을 요격하는 드론을 소환합니다.', icon: '🛰️' }
         ];
 
         const shuffled = upgradesList.sort(() => 0.5 - Math.random());
@@ -749,6 +926,16 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'spd': player.speed += 5; break;
             case 'mag': player.magnetRange *= 1.3; break;
             case 'hp': player.hp = Math.min(player.maxHp, player.hp + 30); break;
+            case 'multishot': player.multishotLevel++; break;
+            case 'piercing': player.piercingLevel++; break;
+            case 'drone': 
+                player.hasDrone = true;
+                let droneEl = document.createElement('div');
+                droneEl.className = 'drone';
+                droneEl.textContent = '🛰️';
+                battleArena.appendChild(droneEl);
+                drones.push({ x: player.x, y: player.y, el: droneEl, fireTimer: 0 });
+                break;
         }
         
         levelUpScreen.style.display = 'none';
@@ -759,21 +946,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Visuals & UI ---
     function render() {
-        playerContainer.style.left = `${player.x}%`;
-        playerContainer.style.top = `${player.y}%`;
+        playerContainer.style.left = `${player.x}px`;
+        playerContainer.style.top = `${player.y}px`;
 
         enemies.forEach(e => {
-            if(e.el) { e.el.style.left = `${e.x}%`; e.el.style.top = `${e.y}%`; }
+            if(e.el) { e.el.style.left = `${e.x}px`; e.el.style.top = `${e.y}px`; }
         });
         
         if (bossActive && currentBoss && currentBoss.el) {
-            currentBoss.el.style.left = `${currentBoss.x}%`;
-            currentBoss.el.style.top = `${currentBoss.y}%`;
+            currentBoss.el.style.left = `${currentBoss.x}px`;
+            currentBoss.el.style.top = `${currentBoss.y}px`;
         }
 
-        bullets.forEach(b => { if(b.el) { b.el.style.left = `${b.x}%`; b.el.style.top = `${b.y}%`; } });
-        enemyBullets.forEach(b => { if(b.el) { b.el.style.left = `${b.x}%`; b.el.style.top = `${b.y}%`; } });
-        gems.forEach(g => { if(g.el) { g.el.style.left = `${g.x}%`; g.el.style.top = `${g.y}%`; } });
+        bullets.forEach(b => { if(b.el) { b.el.style.left = `${b.x}px`; b.el.style.top = `${b.y}px`; } });
+        enemyBullets.forEach(b => { if(b.el) { b.el.style.left = `${b.x}px`; b.el.style.top = `${b.y}px`; } });
+        gems.forEach(g => { if(g.el) { g.el.style.left = `${g.x}px`; g.el.style.top = `${g.y}px`; } });
     }
 
     function updateHUD() {
@@ -796,11 +983,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function createParticleExplosion(x, y) {
+        for (let i = 0; i < 12; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.left = `${x}px`;
+            p.style.top = `${y}px`;
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * 80 + 20; // 픽셀 스케일로 키움
+            const tx = x + Math.cos(angle) * dist;
+            const ty = y + Math.sin(angle) * dist;
+            p.style.transition = 'all 0.5s cubic-bezier(0.1, 0.8, 0.3, 1)';
+            battleArena.appendChild(p);
+            
+            setTimeout(() => {
+                p.style.left = `${tx}px`;
+                p.style.top = `${ty}px`;
+                p.style.opacity = '0';
+            }, 10);
+            
+            setTimeout(() => p.remove(), 500);
+        }
+    }
+
     function createSpark(x, y) {
         const p = document.createElement('div');
         p.className = 'particle';
-        p.style.left = `${x}%`;
-        p.style.top = `${y}%`;
+        p.style.left = `${x}px`;
+        p.style.top = `${y}px`;
         battleArena.appendChild(p);
         setTimeout(() => p.remove(), 200);
     }
@@ -809,8 +1019,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const floatEl = document.createElement('div');
         floatEl.className = `floating-dmg ${isCrit ? 'critical' : ''}`;
         floatEl.textContent = text;
-        floatEl.style.left = `calc(${x}% + ${(Math.random()-0.5)*20}px)`;
-        floatEl.style.top = `calc(${y}% + ${(Math.random()-0.5)*20}px)`;
+        floatEl.style.left = `calc(${x}px + ${(Math.random()-0.5)*40}px)`;
+        floatEl.style.top = `calc(${y}px + ${(Math.random()-0.5)*40}px)`;
         battleArena.appendChild(floatEl);
         setTimeout(() => floatEl.remove(), 800);
     }

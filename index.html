@@ -15,7 +15,7 @@
                 💎 크레딧: <span id="total-credits">0</span>
             </div>
             <h1 class="neon-text title-glow">스페이스 레이드 🚀</h1>
-            <p class="subtitle">WASD로 이동하며 마우스로 적을 직접 클릭해 사격하세요!</p>
+            <p class="subtitle">마우스 커서 방향으로 자동 사격합니다!<br>게이지가 차면 스페이스바를 눌러 궁극기를 발사하세요!</p>
             
             <div class="customizer hologram-box">
                 <h3>내 캐릭터 & 색상 커스터마이징</h3>
@@ -76,6 +76,17 @@
                         업그레이드<br><span id="upg-spd-cost">500</span> 💎
                     </button>
                 </div>
+
+                <div class="upgrade-item">
+                    <div class="upgrade-info">
+                        <div class="upgrade-name">연사 속도 강화</div>
+                        <div class="upgrade-desc">레이저 자동 발사 속도가 빨라집니다.</div>
+                        <div class="upgrade-level">Lv. <span id="upg-firerate-level">0</span></div>
+                    </div>
+                    <button class="btn upgrade-btn" id="buy-firerate-btn">
+                        업그레이드<br><span id="upg-firerate-cost">500</span> 💎
+                    </button>
+                </div>
             </div>
             <button id="shop-back-btn" class="btn secondary-btn neon-btn" style="margin-top: 1rem;">돌아가기</button>
         </div>
@@ -91,20 +102,32 @@
 
         <!-- Game Screen -->
         <div id="game-screen" class="screen">
-            <!-- Top HUD: EXP and Level -->
-            <div class="top-hud">
+            <canvas id="bg-canvas"></canvas>
+            
+            <!-- HUD Elements -->
+            <div class="hud-top-left">
                 <div class="exp-container">
                     <div class="level-text">Lv. <span id="player-level">1</span></div>
                     <div class="exp-bar-bg">
                         <div class="exp-bar-fill" id="exp-bar"></div>
                     </div>
                 </div>
+            </div>
+            
+            <div class="hud-top-center">
                 <!-- Boss HP (Hidden by default) -->
-                <div class="boss-hp-container" id="boss-hp-container" style="display: none; margin-top: 0.5rem;">
+                <div class="boss-hp-container" id="boss-hp-container" style="display: none;">
                     <div class="boss-name" id="boss-name-text">알 수 없는 보스 개체</div>
                     <div class="hp-bar-bg">
                         <div class="hp-bar-fill" id="boss-hp-bar"></div>
                     </div>
+                </div>
+            </div>
+            
+            <div class="hud-top-right">
+                <div class="score-container">
+                    <span style="color: #fff; font-size: 1.5rem;">Score: <span id="score" class="score">0</span></span>
+                    <span style="color: #e74c3c; font-size: 1.5rem; display: block; text-align: right;">HP: <span id="player-hp-text">100</span></span>
                 </div>
             </div>
             
@@ -122,17 +145,14 @@
                 </div>
             </div>
             
-            <!-- Bottom HUD -->
-            <div class="bottom-hud">
+            
+            <!-- Bottom HUD (Ult) -->
+            <div class="hud-bottom-center">
                 <div class="status-hud">
-                    <div class="score-container" style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                        <span style="color: #fff; font-size: 1.2rem;">Score: <span id="score" class="score">0</span></span>
-                        <span style="color: #e74c3c; font-size: 1.2rem;">HP: <span id="player-hp-text">100</span></span>
-                    </div>
                     
                     <div class="ult-label" style="color: #f1c40f; font-size: 1rem; display: flex; justify-content: space-between;">
-                        <span>Ultimate (Auto)</span>
-                        <span id="ult-ready-text" style="display: none; font-weight: bold; animation: pulse 1s infinite;">FIRING!</span>
+                        <span>Ultimate (Spacebar)</span>
+                        <span id="ult-ready-text" style="display: none; font-weight: bold; animation: pulse 1s infinite;">스페이스바를 눌러 발사!</span>
                     </div>
                     <div class="ult-bar-bg" style="width: 100%; height: 12px; background: rgba(255,255,255,0.2); border-radius: 6px; overflow: hidden; border: 1px solid #f1c40f;">
                         <div class="ult-bar-fill" id="ult-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #f39c12, #f1c40f); transition: width 0.1s linear;"></div>
