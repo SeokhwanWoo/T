@@ -61,18 +61,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Assets Manager ---
     const assets = {
-        playerBlue: new Image(),
-        playerRed: new Image(),
-        playerGreen: new Image(),
-        enemies: [new Image(), new Image(), new Image(), new Image(), new Image()],
-        bossMid: new Image(),
-        bossFinal: new Image()
+        imgPlayer: new Image(),
+        imgAliens: new Image(),
+        imgBosses: new Image()
     };
 
     let assetsLoaded = false;
     function loadAssets(callback) {
         let loadedCount = 0;
-        const totalAssets = 3 + 5 + 2;
+        const totalAssets = 3;
         
         function onImageLoad() {
             loadedCount++;
@@ -84,39 +81,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const onImageError = onImageLoad; // 실패해도 일단 진행
 
-        assets.playerBlue.onload = onImageLoad;
-        assets.playerBlue.onerror = onImageError;
-        assets.playerBlue.src = 'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/ship.png';
+        assets.imgPlayer.onload = onImageLoad;
+        assets.imgPlayer.onerror = onImageError;
+        assets.imgPlayer.src = './assets/player_ships.png';
         
-        assets.playerRed.onload = onImageLoad;
-        assets.playerRed.onerror = onImageError;
-        assets.playerRed.src = 'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/games/asteroids/ship.png';
+        assets.imgAliens.onload = onImageLoad;
+        assets.imgAliens.onerror = onImageError;
+        assets.imgAliens.src = './assets/aliens_midboss.png';
         
-        assets.playerGreen.onload = onImageLoad;
-        assets.playerGreen.onerror = onImageError;
-        assets.playerGreen.src = 'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/player.png';
-
-        const enemyUrls = [
-            'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/baddie.png',
-            'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/space-baddie.png',
-            'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/mine.png',
-            'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/asteroids_baddie.png',
-            'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/ufo.png'
-        ];
-        
-        enemyUrls.forEach((url, i) => {
-            assets.enemies[i].onload = onImageLoad;
-            assets.enemies[i].onerror = onImageError;
-            assets.enemies[i].src = url;
-        });
-
-        assets.bossMid.onload = onImageLoad;
-        assets.bossMid.onerror = onImageError;
-        assets.bossMid.src = 'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/phaser-dude.png';
-
-        assets.bossFinal.onload = onImageLoad;
-        assets.bossFinal.onerror = onImageError;
-        assets.bossFinal.src = 'https://raw.githubusercontent.com/photonstorm/phaser3-examples/master/public/assets/sprites/bsquadron1.png';
+        assets.imgBosses.onload = onImageLoad;
+        assets.imgBosses.onerror = onImageError;
+        assets.imgBosses.src = './assets/boss_hazards_items.png';
     }
 
     // 초기화 시 에셋 로드 시작
@@ -191,8 +166,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let gems = [];
     let drones = [];
     let particles = [];
-    let floatingTexts = [];
     let cinematicEffects = [];
+    let asteroids = [];
+    let capsules = [];
+    let combo = 0;
+    let comboTimer = 0;
+    let isFever = false;
+    let feverTimer = 0;
+
     let mousePos = { x: gameWidth / 2, y: gameHeight / 4 };
     
     let enemySpawnTimer = 0;
@@ -383,6 +364,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear DOM entities
         battleArena.querySelectorAll('.enemy, .boss-enemy, .gem, .bullet, .enemy-bullet, .particle, .floating-dmg, .ult-laser, .drone, .drone-bullet, .massive-explosion').forEach(e => e.remove());
         enemies = []; bullets = []; enemyBullets = []; gems = []; drones = [];
+        asteroids = []; capsules = []; cinematicEffects = []; particles = [];
+        combo = 0; comboTimer = 0; isFever = false; feverTimer = 0;
+        enemySpawnTimer = 0;
         
         // Init Stars for Parallax
         stars = [];
@@ -437,7 +421,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (player.hasDrone) updateDrones(deltaTime);
             updateEnemies(deltaTime, timestamp);
             updateBullets(deltaTime);
+            updateDrones(deltaTime);
             updateGems(deltaTime);
+            updateHazards(deltaTime); // 소행성 및 캡슐 업데이트
+            updateCombo(deltaTime);
             checkCollisions();
             updateEffects(deltaTime);
         }
@@ -620,17 +607,94 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateBullets(dt) {
         const dtSec = dt / 1000;
-        [bullets, enemyBullets].forEach(list => {
-            for (let i = list.length - 1; i >= 0; i--) {
-                const b = list[i];
-                b.x += b.vx * dtSec;
-                b.y += b.vy * dtSec;
-                
-                if (b.x < -50 || b.x > gameWidth + 50 || b.y < -50 || b.y > gameHeight + 50) {
-                    list.splice(i, 1);
-                }
+        // Player Bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            const b = bullets[i];
+            b.x += b.vx * dtSec;
+            b.y += b.vy * dtSec;
+            
+            if (b.x < -50 || b.x > gameWidth + 50 || b.y < -50 || b.y > gameHeight + 50) {
+                bullets.splice(i, 1);
+            }
+        }
+        // Enemy Bullets
+        enemyBullets.forEach((b, i) => {
+            b.x += b.vx * dtSec;
+            b.y += b.vy * dtSec;
+            if (b.y > gameHeight + 50 || b.y < -50 || b.x < -50 || b.x > gameWidth + 50) {
+                enemyBullets.splice(i, 1);
             }
         });
+    }
+
+    function updateHazards(dt) {
+        const dtSec = dt / 1000;
+        
+        // Asteroids
+        if (Math.random() < 0.005) {
+            asteroids.push({
+                x: Math.random() * gameWidth,
+                y: -50,
+                vx: (Math.random() - 0.5) * 100,
+                vy: Math.random() * 100 + 50,
+                hp: 30,
+                rot: 0,
+                rotSpeed: (Math.random() - 0.5) * 5
+            });
+        }
+        
+        for(let i = asteroids.length - 1; i >= 0; i--) {
+            let a = asteroids[i];
+            a.x += a.vx * dtSec;
+            a.y += a.vy * dtSec;
+            a.rot += a.rotSpeed * dtSec;
+            if(a.y > gameHeight + 100) asteroids.splice(i, 1);
+        }
+
+        // Capsules
+        if (Math.random() < 0.001) {
+            capsules.push({
+                x: Math.random() * gameWidth,
+                y: -30,
+                vy: 50,
+                type: Math.random() < 0.5 ? 'shield' : 'berserk'
+            });
+        }
+
+        for(let i = capsules.length - 1; i >= 0; i--) {
+            let c = capsules[i];
+            c.y += c.vy * dtSec;
+            if(c.y > gameHeight + 50) capsules.splice(i, 1);
+        }
+    }
+
+    function updateCombo(dt) {
+        const dtSec = dt / 1000;
+        if (combo > 0 && !isFever) {
+            comboTimer -= dtSec;
+            if (comboTimer <= 0) combo = 0;
+        }
+        
+        if (isFever) {
+            feverTimer -= dtSec;
+            if (feverTimer <= 0) {
+                isFever = false;
+                combo = 0;
+                player.fireRate = player.fireRate * 2; // 원상복구
+            }
+        }
+    }
+
+    function addCombo() {
+        combo++;
+        comboTimer = 2.0; // 2초 내에 적을 처치해야 콤보 유지
+        if (combo >= 30 && !isFever) {
+            isFever = true;
+            feverTimer = 5.0; // 5초 피버타임
+            player.fireRate = player.fireRate / 2; // 발사속도 2배
+            playSound('fever');
+            createFloatingText("FEVER TIME!", player.x, player.y - 40, true);
+        }
     }
 
     function updateEnemies(dt, timestamp) {
@@ -794,6 +858,59 @@ document.addEventListener('DOMContentLoaded', () => {
         if (bossActive && currentBoss && getDistance(currentBoss.x, currentBoss.y, player.x, player.y) < 40) {
             damagePlayer(10);
         }
+
+        // Player Bullets vs Asteroids
+        for(let i=bullets.length-1; i>=0; i--) {
+            const b = bullets[i];
+            let hit = false;
+            for(let j=asteroids.length-1; j>=0; j--) {
+                const a = asteroids[j];
+                if(getDistance(b.x, b.y, a.x, a.y) < 20) {
+                    a.hp -= player.damage * b.damageMult;
+                    createFloatingText(Math.ceil(player.damage * b.damageMult), b.x, b.y, false);
+                    hit = true;
+                    if(a.hp <= 0) {
+                        createParticleExplosion(a.x, a.y);
+                        asteroids.splice(j, 1);
+                        score += 5;
+                    }
+                    break;
+                }
+            }
+            if(hit) {
+                createSpark(b.x, b.y);
+                if(b.pierceCount > 0) b.pierceCount--;
+                else bullets.splice(i, 1);
+            }
+        }
+
+        // Capsules vs Player
+        for(let i=capsules.length-1; i>=0; i--) {
+            const c = capsules[i];
+            if(getDistance(player.x, player.y, c.x, c.y) < 25) {
+                if(c.type === 'shield') {
+                    player.hp = Math.min(player.maxHp, player.hp + 50);
+                    createFloatingText("+50 HP", player.x, player.y - 20, true);
+                } else if(c.type === 'berserk') {
+                    isFever = true;
+                    feverTimer = 5.0;
+                    player.fireRate = player.fireRate / 2;
+                    createFloatingText("BERSERK!", player.x, player.y - 20, true);
+                }
+                playSound('powerup');
+                capsules.splice(i, 1);
+            }
+        }
+
+        // Asteroids vs Player
+        for(let i=asteroids.length-1; i>=0; i--) {
+            const a = asteroids[i];
+            if(getDistance(player.x, player.y, a.x, a.y) < 25) {
+                damagePlayer(15);
+                createParticleExplosion(a.x, a.y);
+                asteroids.splice(i, 1);
+            }
+        }
     }
 
     // --- Shake Helper ---
@@ -815,6 +932,7 @@ document.addEventListener('DOMContentLoaded', () => {
             score += 10;
             totalCredits += 2; 
             addUltGauge(5);
+            addCombo();
             spawnGem(e.x, e.y);
             createParticleExplosion(e.x, e.y);
             enemies.splice(index, 1);
@@ -1063,16 +1181,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Visuals & UI ---
-    function drawAsset(img, x, y, w, h) {
-        if (img.complete && img.naturalWidth > 0) {
-            ctx.drawImage(img, x, y, w, h);
+    function drawClippedAsset(img, sx, sy, sw, sh, dx, dy, dw, dh, isHit) {
+        if (img.complete && img.naturalWidth > 0 && sw > 0 && sh > 0) {
+            ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+            if (isHit) {
+                ctx.globalCompositeOperation = 'source-atop';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.fillRect(dx, dy, dw, dh);
+                ctx.globalCompositeOperation = 'source-over';
+            }
         } else {
             // 이미지 로드 실패 시 대체 그래픽(폴백) 렌더링
             ctx.fillStyle = '#ff00ff';
-            ctx.fillRect(x, y, w, h);
+            ctx.fillRect(dx, dy, dw, dh);
+            if (isHit) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.fillRect(dx, dy, dw, dh);
+            }
             ctx.fillStyle = '#fff';
             ctx.font = '20px Arial';
-            ctx.fillText('?', x + w/2 - 5, y + h/2 + 5);
+            ctx.fillText('?', dx + dw/2 - 5, dy + dh/2 + 5);
         }
     }
 
@@ -1086,16 +1214,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Rotate player towards mouse
         const dx = mousePos.x - player.x;
         const dy = mousePos.y - player.y;
-        const angle = Math.atan2(dy, dx) + Math.PI/2; // +90deg to face top
+        const angle = Math.atan2(dy, dx) + Math.PI/2; 
         ctx.rotate(angle);
 
-        if (player.isHit) ctx.globalAlpha = 0.5;
+        const colorIdx = rocketColor === 'red' ? 1 : (rocketColor === 'green' ? 2 : 0);
+        const psw = (assets.imgPlayer.naturalWidth || 300) / 3;
+        const psh = assets.imgPlayer.naturalHeight || 100;
         
-        let pAsset = assets.playerBlue;
-        if (rocketColor === 'red') pAsset = assets.playerRed;
-        if (rocketColor === 'green') pAsset = assets.playerGreen;
-        
-        drawAsset(pAsset, -25, -25, 50, 50);
+        drawClippedAsset(assets.imgPlayer, colorIdx * psw, 0, psw, psh, -25, -25, 50, 50, player.isHit);
         ctx.restore();
         
         // Drones
@@ -1108,6 +1234,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Enemies
+        const esw = (assets.imgAliens.naturalWidth || 500) / 5;
+        const esh = (assets.imgAliens.naturalHeight || 200) / 2;
         enemies.forEach(e => {
             ctx.save();
             ctx.translate(e.x, e.y);
@@ -1118,8 +1246,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const eAngle = Math.atan2(edy, edx) + Math.PI/2;
             ctx.rotate(eAngle);
 
-            if (e.isHit) ctx.globalAlpha = 0.5;
-            drawAsset(assets.enemies[e.typeIdx], -25, -25, 50, 50);
+            drawClippedAsset(assets.imgAliens, e.typeIdx * esw, 0, esw, esh, -25, -25, 50, 50, e.isHit);
             ctx.restore();
         });
 
@@ -1128,12 +1255,24 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.save();
             ctx.translate(currentBoss.x, currentBoss.y);
             
+            // rotate boss towards player
+            const bdx = player.x - currentBoss.x;
+            const bdy = player.y - currentBoss.y;
+            const bAngle = Math.atan2(bdy, bdx) + Math.PI/2;
+            ctx.rotate(bAngle);
+            
             const isFinal = currentBoss.isFinal;
             const size = isFinal ? 250 : 120;
-            const bAsset = isFinal ? assets.bossFinal : assets.bossMid;
             
-            if (currentBoss.isHit) ctx.globalAlpha = 0.5;
-            drawAsset(bAsset, -size/2, -size/2, size, size);
+            if (isFinal) {
+                const fsw = (assets.imgBosses.naturalWidth || 400) * 0.5;
+                const fsh = assets.imgBosses.naturalHeight || 200;
+                drawClippedAsset(assets.imgBosses, fsw * 0.5, 0, fsw, fsh, -size/2, -size/2, size, size, currentBoss.isHit);
+            } else {
+                const bsw = assets.imgAliens.naturalWidth || 500;
+                const bsh = (assets.imgAliens.naturalHeight || 200) / 2;
+                drawClippedAsset(assets.imgAliens, 0, bsh, bsw, bsh, -size/2, -size/2, size, size, currentBoss.isHit);
+            }
             ctx.restore();
         }
 
@@ -1162,6 +1301,31 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.font = '20px sans-serif';
         gems.forEach(g => {
             ctx.fillText('💎', g.x - 10, g.y + 10);
+        });
+
+        // Asteroids
+        const asw = (assets.imgBosses.naturalWidth || 400) * 0.25;
+        const ash = assets.imgBosses.naturalHeight || 200;
+        asteroids.forEach(a => {
+            ctx.save();
+            ctx.translate(a.x, a.y);
+            ctx.rotate(a.rot);
+            drawClippedAsset(assets.imgBosses, 0, 0, asw, ash, -20, -20, 40, 40, false);
+            ctx.restore();
+        });
+
+        // Capsules
+        const csw = (assets.imgBosses.naturalWidth || 400) * 0.25;
+        const csh = (assets.imgBosses.naturalHeight || 200) * 0.5;
+        capsules.forEach(c => {
+            ctx.save();
+            ctx.translate(c.x, c.y);
+            if (c.type === 'shield') {
+                drawClippedAsset(assets.imgBosses, csw * 3, 0, csw, csh, -15, -15, 30, 30, false);
+            } else {
+                drawClippedAsset(assets.imgBosses, csw * 3, csh, csw, csh, -15, -15, 30, 30, false);
+            }
+            ctx.restore();
         });
     }
 
