@@ -20,11 +20,10 @@
             <p class="subtitle">마우스를 클릭해 보스와 쫄병들을 격파하세요!</p>
             
             <div class="customizer hologram-box">
-                <h3>캐릭터 & 색상 커스터마이징</h3>
-                <div style="display: flex; justify-content: space-around; margin-bottom: 0.5rem;">
+                <h3>내 캐릭터 & 색상 커스터마이징</h3>
+                <div style="display: flex; justify-content: center; margin-bottom: 0.5rem;">
                     <!-- Player Customizer -->
                     <div>
-                        <h4 style="color: #66fcf1; margin-bottom: 0.5rem;">내 캐릭터</h4>
                         <div class="rocket-preview" id="rocket-preview">🛸</div>
                         <div class="char-options" style="display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem;">
                             <button class="char-btn active" data-char="🛸">🛸</button>
@@ -38,18 +37,6 @@
                             <button class="color-btn" data-color="hue-rotate(240deg)" style="background: #3498db; border-color: #3498db;"></button>
                             <button class="color-btn" data-color="hue-rotate(280deg)" style="background: #9b59b6; border-color: #9b59b6;"></button>
                             <button class="color-btn" data-color="hue-rotate(60deg)" style="background: #f1c40f; border-color: #f1c40f;"></button>
-                        </div>
-                    </div>
-                    
-                    <!-- Boss Customizer -->
-                    <div>
-                        <h4 style="color: #e74c3c; margin-bottom: 0.5rem;">보스 외형</h4>
-                        <div class="boss-preview" id="boss-preview" style="font-size: 3.5rem; filter: drop-shadow(0 0 10px #e74c3c); margin-bottom: 1.5rem;">👾</div>
-                        <div class="boss-char-options" style="display: flex; justify-content: center; gap: 0.5rem;">
-                            <button class="boss-char-btn active" data-char="👾">👾</button>
-                            <button class="boss-char-btn" data-char="🐙">🐙</button>
-                            <button class="boss-char-btn" data-char="🐉">🐉</button>
-                            <button class="boss-char-btn" data-char="🌑">🌑</button>
                         </div>
                     </div>
                 </div>
@@ -67,10 +54,10 @@
             <!-- Top HUD -->
             <div class="top-hud">
                 <div class="small-title">스페이스 레이드 🚀🚀</div>
-                <div class="boss-hp-container">
-                    <div class="boss-name">사이보그 네뷸라 몬스터</div>
+                <div class="boss-hp-container" id="boss-hp-container" style="display: none;">
+                    <div class="boss-name">알 수 없는 보스 개체</div>
                     <div class="hp-bar-bg">
-                        <div id="boss-hp-bar" class="hp-bar-fill"></div>
+                        <div class="hp-bar-fill" id="boss-hp-bar"></div>
                     </div>
                     <div class="hp-text"><span id="boss-hp-text">100</span>%</div>
                 </div>

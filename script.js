@@ -28,16 +28,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const rocketPreview = document.getElementById('rocket-preview');
     const playerRocketEmoji = document.getElementById('player-rocket-emoji');
-    const bossPreview = document.getElementById('boss-preview');
     const bossMonsterEmoji = document.querySelector('.boss-emoji');
     const bossMonster = document.getElementById('boss-monster');
     const bossShield = document.getElementById('boss-shield');
     const enrageWarning = document.getElementById('enrage-warning');
     const laserBeam = document.getElementById('laser-beam');
+    const bossHpContainer = document.getElementById('boss-hp-container');
+    const bossNameText = document.querySelector('.boss-name');
     
     const colorBtns = document.querySelectorAll('.color-btn');
     const charBtns = document.querySelectorAll('.char-btn');
-    const bossCharBtns = document.querySelectorAll('.boss-char-btn');
 
     const bossHpBar = document.getElementById('boss-hp-bar');
     const bossHpText = document.getElementById('boss-hp-text');
@@ -73,14 +73,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Game Variables
     let score = 0;
     let combo = 0;
-    let maxTime = 60; 
+    let comboResetTimer;
+    let maxTime = 120; // 2 minutes game
     let timeLeft = maxTime;
-    let maxBossHp = 6000; // Increased HP for 1 minute game
+    let maxBossHp = 8000; // Increased HP
     let bossHp = maxBossHp;
+    
     let timerInterval;
     let bossMoveInterval;
     let minionSpawnInterval;
     let isPlaying = false;
+    let bossSpawned = false;
     
     let timeDilationActive = false;
     let shieldActive = false;
@@ -92,10 +95,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let shieldHits = 0;
     let empTimerActive = false;
 
+    // Boss Pool
+    const bossPool = [
+        { char: '👾', name: '사이보그 네뷸라 몬스터' },
+        { char: '🐙', name: '은하계 심연의 크라켄' },
+        { char: '🐉', name: '항성 포식자 드래곤' },
+        { char: '🌑', name: '흑화된 소행성' }
+    ];
+
     // Local Storage Data
     let rocketColor = localStorage.getItem('gugudanRocketColor') || 'hue-rotate(0deg)';
     let playerChar = localStorage.getItem('gugudanPlayerChar') || '🛸';
-    let bossChar = localStorage.getItem('gugudanBossChar') || '👾';
     let rankings = JSON.parse(localStorage.getItem('gugudanRankings')) || [];
     let totalCredits = parseInt(localStorage.getItem('gugudanCredits')) || 0;
     let upgrades = JSON.parse(localStorage.getItem('gugudanUpgrades')) || { fuel: 0, damage: 0, fever: 0, goggles: false, emp: 0 };
@@ -144,7 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function initCustomizer() {
         applyRocketColor(rocketColor);
         applyPlayerChar(playerChar);
-        applyBossChar(bossChar);
 
         colorBtns.forEach(btn => {
             if(btn.dataset.color === rocketColor) btn.classList.add('active');
@@ -167,17 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('gugudanPlayerChar', playerChar);
             });
         });
-
-        bossCharBtns.forEach(btn => {
-            if(btn.dataset.char === bossChar) btn.classList.add('active');
-            btn.addEventListener('click', (e) => {
-                bossCharBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                bossChar = btn.dataset.char;
-                applyBossChar(bossChar);
-                localStorage.setItem('gugudanBossChar', bossChar);
-            });
-        });
     }
 
     function applyRocketColor(color) {
@@ -188,11 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function applyPlayerChar(char) {
         rocketPreview.textContent = char;
         playerRocketEmoji.textContent = char;
-    }
-
-    function applyBossChar(char) {
-        bossPreview.textContent = char;
-        bossMonsterEmoji.textContent = char;
     }
 
     function updateShopUI() {
@@ -252,28 +245,29 @@ document.addEventListener('DOMContentLoaded', () => {
         isBossShielded = false;
         empTimerActive = false;
         shieldHits = 0;
+        bossSpawned = false;
         
         document.body.classList.remove('fever-mode');
         bossShield.style.display = 'none';
         enrageWarning.className = 'enrage-warning';
         clearTimeout(feverTimer);
+        clearTimeout(comboResetTimer);
+        
+        // Hide Boss initially
+        bossMonster.style.display = 'none';
+        bossHpContainer.style.display = 'none';
         
         // Clear old minions
         document.querySelectorAll('.minion').forEach(m => m.remove());
         
-        maxTime = 60 + (upgrades.fuel * 2);
+        maxTime = 120 + (upgrades.fuel * 2); // 120s base
         timeLeft = maxTime;
-        maxBossHp = 6000;
+        maxBossHp = 8000;
         bossHp = maxBossHp;
         isPlaying = true;
         timeDilationActive = false;
         shieldActive = false;
         
-        // Reset boss position
-        bossMonster.style.top = '50%';
-        bossMonster.style.right = '2rem';
-        bossMonster.style.left = 'auto';
-
         updateScore();
         updateCombo();
         updateFuel();
@@ -293,22 +287,60 @@ document.addEventListener('DOMContentLoaded', () => {
             timeLeft -= burnRate; 
             updateFuel();
             
+            // Check Boss Spawn (Half time)
+            if (timeLeft <= maxTime / 2 && !bossSpawned) {
+                spawnBoss();
+            }
+
             if (timeLeft <= 0) {
                 endGame(false); 
             }
         }, 100);
 
-        startBossMovement();
         startMinionSpawning();
+    }
+
+    function spawnBoss() {
+        bossSpawned = true;
+        
+        // Select Random Boss
+        const selectedBoss = bossPool[Math.floor(Math.random() * bossPool.length)];
+        bossMonsterEmoji.textContent = selectedBoss.char;
+        bossNameText.textContent = selectedBoss.name;
+
+        // Show UI
+        bossMonster.style.display = 'block';
+        bossHpContainer.style.display = 'block';
+        bossMonster.style.top = '50%';
+        bossMonster.style.left = '80%';
+        
+        // Warning
+        enrageWarning.textContent = '⚠️ BOSS INCOMING! ⚠️';
+        enrageWarning.classList.add('show');
+        setTimeout(() => enrageWarning.classList.remove('show'), 2000);
+
+        startBossMovement();
+        
+        // Restart minion spawning to apply lower frequency
+        startMinionSpawning();
+    }
+
+    function resetComboTimer() {
+        clearTimeout(comboResetTimer);
+        comboResetTimer = setTimeout(() => {
+            if (!isPlaying) return;
+            combo = 0;
+            updateCombo();
+            updateSkills();
+            showFeedback('콤보가 끊겼습니다!', 'wrong');
+        }, 3000);
     }
 
     function startBossMovement() {
         clearInterval(bossMoveInterval);
         bossMoveInterval = setInterval(() => {
-            if (!isPlaying || empTimerActive) return;
+            if (!isPlaying || empTimerActive || !bossSpawned) return;
             
-            const arenaRect = battleArena.getBoundingClientRect();
-            // Move boss within right half of the arena
             const minTop = 20;
             const maxTop = 80;
             const minLeft = 50;
@@ -333,6 +365,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startMinionSpawning() {
         clearInterval(minionSpawnInterval);
+        
+        const spawnDelay = bossSpawned ? (isEnraged ? 1000 : 2000) : 800; // Faster in Phase 1
+        
         minionSpawnInterval = setInterval(() => {
             if (!isPlaying || empTimerActive) return;
             
@@ -353,6 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(!isPlaying) return;
                 
                 combo++;
+                resetComboTimer();
                 checkFever();
                 
                 const points = 15 * (isFever ? 2 : 1);
@@ -362,6 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateSkills();
                 
                 createFloatingText(`+${points}`, '');
+                fireLaser(minion);
                 
                 // Boom effect
                 minion.style.transform = 'scale(1.5)';
@@ -377,16 +414,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     minion.style.opacity = '0';
                     setTimeout(() => minion.remove(), 200);
                 }
-            }, 3000);
+            }, 2500);
 
-        }, isEnraged ? 1000 : 2000);
+        }, spawnDelay);
     }
 
     function handleBossClick(e) {
         e.stopPropagation(); // Prevent triggering arena miss
-        if (!isPlaying) return;
+        if (!isPlaying || !bossSpawned) return;
         
         combo++;
+        resetComboTimer();
         checkFever();
         
         // Visual laser
@@ -439,57 +477,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleArenaClick(e) {
-        // Missed click
         if (!isPlaying || e.target !== battleArena) return;
-        
-        combo = 0;
-        updateCombo();
-        updateSkills();
-        
-        if (shieldActive) {
-            showFeedback('방어막 가동! 피해 무효화 🛡️', 'correct');
-            shieldActive = false;
-            skillShield.classList.remove('skill-active');
-        } else {
-            appContainer.classList.add('shake-heavy');
-            playerRocketEmoji.classList.add('ship-hit');
-            
-            let penalty = 2;
-            if (upgrades.goggles) penalty = 1;
-            
-            timeLeft -= penalty; 
-            updateFuel();
-            showFeedback(`빗나감! 연료 -${penalty}초 ⚠️`, 'wrong');
-            
-            // Show miss text where clicked
-            const missText = document.createElement('div');
-            missText.className = 'floating-dmg';
-            missText.style.color = '#e74c3c';
-            missText.textContent = 'MISS!';
-            missText.style.left = `${e.clientX - gameScreen.getBoundingClientRect().left}px`;
-            missText.style.top = `${e.clientY - gameScreen.getBoundingClientRect().top}px`;
-            gameScreen.appendChild(missText);
-            setTimeout(() => missText.remove(), 1000);
-            
-            setTimeout(() => {
-                appContainer.classList.remove('shake-heavy');
-                playerRocketEmoji.classList.remove('ship-hit');
-            }, 500);
-            
-            if (timeLeft <= 0) {
-                setTimeout(() => endGame(false), 500);
-            }
-        }
+        // Just fire laser to empty space, no penalty
+        fireLaser(null);
     }
 
     function fireLaser(target) {
         if(isFever) laserBeam.classList.add('fever-laser');
         
-        // Calculate dynamic width to target
-        const playerRect = playerRocketEmoji.getBoundingClientRect();
-        const targetRect = target.getBoundingClientRect();
+        let dist = 300; // default for miss
         
-        const dist = targetRect.left - playerRect.right + 20;
+        if (target) {
+            const playerRect = playerRocketEmoji.getBoundingClientRect();
+            const targetRect = target.getBoundingClientRect();
+            dist = targetRect.left - playerRect.right + 20;
+        }
+
         laserBeam.style.width = `${dist}px`;
         laserBeam.style.opacity = '1';
         
@@ -541,20 +544,29 @@ document.addEventListener('DOMContentLoaded', () => {
         floatEl.className = `floating-dmg ${type}`;
         floatEl.textContent = text;
         
-        const rect = bossMonster.getBoundingClientRect();
-        const appRect = gameScreen.getBoundingClientRect();
+        let centerX, centerY;
+        if (bossSpawned && bossMonster.style.display !== 'none') {
+            const rect = bossMonster.getBoundingClientRect();
+            const appRect = gameScreen.getBoundingClientRect();
+            centerX = rect.left - appRect.left + (rect.width/2);
+            centerY = rect.top - appRect.top + (rect.height/2);
+        } else {
+            centerX = 200 + Math.random() * 100;
+            centerY = 200 + Math.random() * 100;
+        }
         
         const offsetX = (Math.random() - 0.5) * 50;
         const offsetY = (Math.random() - 0.5) * 50;
         
-        floatEl.style.left = `${rect.left - appRect.left + (rect.width/2) + offsetX}px`;
-        floatEl.style.top = `${rect.top - appRect.top + (rect.height/2) + offsetY}px`;
+        floatEl.style.left = `${centerX + offsetX}px`;
+        floatEl.style.top = `${centerY + offsetY}px`;
         
         gameScreen.appendChild(floatEl);
         setTimeout(() => floatEl.remove(), 1000);
     }
 
     function createParticles(targetEl) {
+        if (!targetEl) return;
         const rect = targetEl.getBoundingClientRect();
         const appRect = gameScreen.getBoundingClientRect();
         const centerX = rect.left - appRect.left + rect.width / 2;
@@ -647,7 +659,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateSkills() {
-        // Combo requirements adjusted for clicker
         document.querySelector('#skill-time .skill-req').textContent = '15 Combo';
         document.querySelector('#skill-shield .skill-req').textContent = '20 Combo';
 
@@ -705,6 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearInterval(bossMoveInterval);
         clearInterval(minionSpawnInterval);
         clearTimeout(feverTimer);
+        clearTimeout(comboResetTimer);
         document.body.classList.remove('fever-mode');
         
         totalCredits += score;
@@ -716,11 +728,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isWin) {
             resultTitle.textContent = "보스 격파 성공! 🏆";
             resultTitle.className = "neon-text";
-            ratingEl.textContent = '은하계를 구한 클릭 마스터! ✨';
+            ratingEl.textContent = '은하계를 구한 액션 마스터! ✨';
         } else {
             resultTitle.textContent = "연료 소진... 패배 💀";
             resultTitle.className = "neon-text text-danger";
-            ratingEl.textContent = '아쉽습니다. 조준 연습을 더 하고 오세요! 🔧';
+            ratingEl.textContent = '아쉽습니다. 콤보를 더 오랫동안 유지해 보세요! 🔧';
         }
         
         showScreen(resultScreen);
