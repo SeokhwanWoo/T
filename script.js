@@ -92,6 +92,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let score = 0;
     let rankings = JSON.parse(localStorage.getItem('spaceRaidRankings')) || [];
     let rocketColor = localStorage.getItem('spaceRaidRocketColor') || 'blue'; // blue, red, green
+    let rocketChar = localStorage.getItem('spaceRaidRocketChar') || '🚀';
+    
+    // Progressive Image Loading
+    const nanoBananaImg = new Image();
+    nanoBananaImg.src = './assets/nano_banana.png';
+    let isNanoBananaLoaded = false;
+    nanoBananaImg.onload = () => { isNanoBananaLoaded = true; };
     
     let totalCredits = parseInt(localStorage.getItem('spaceRaidCredits')) || 0;
     let persistentUpgrades = JSON.parse(localStorage.getItem('spaceRaidUpgrades')) || { damage: 0, speed: 0, fireRate: 0 };
@@ -248,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Customizer & Shop ---
     function initCustomizer() {
-        applyRocketColor(rocketColor);
+        applyRocketCharAndColor(rocketChar, rocketColor);
 
         colorBtns.forEach(btn => {
             if(btn.dataset.color === rocketColor) btn.classList.add('active');
@@ -256,14 +263,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 colorBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 rocketColor = btn.dataset.color;
-                applyRocketColor(rocketColor);
+                applyRocketCharAndColor(rocketChar, rocketColor);
                 localStorage.setItem('spaceRaidRocketColor', rocketColor);
+            });
+        });
+
+        charBtns.forEach(btn => {
+            if(btn.dataset.char === rocketChar) btn.classList.add('active');
+            btn.addEventListener('click', () => {
+                charBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                rocketChar = btn.dataset.char;
+                applyRocketCharAndColor(rocketChar, rocketColor);
+                localStorage.setItem('spaceRaidRocketChar', rocketChar);
             });
         });
     }
 
-    function applyRocketColor(color) {
-        rocketPreview.textContent = '🚀';
+    function applyRocketCharAndColor(char, color) {
+        rocketPreview.textContent = char;
         rocketPreview.style.backgroundImage = 'none';
         rocketPreview.style.fontSize = '35px';
         rocketPreview.style.display = 'flex';
@@ -1163,6 +1181,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function drawEntityImage(img, x, y, size, isHit) {
+        ctx.drawImage(img, x, y, size, size);
+        if (isHit) {
+            ctx.globalCompositeOperation = 'source-atop';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.fillRect(x, y, size, size);
+            ctx.globalCompositeOperation = 'source-over';
+        }
+    }
+
     function render() {
         // Player
         ctx.save();
@@ -1177,7 +1205,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (rocketColor === 'red') ctx.filter = 'hue-rotate(120deg)';
         else if (rocketColor === 'green') ctx.filter = 'hue-rotate(240deg)';
         
-        drawEmoji('🚀', -25, -25, 50, player.isHit);
+        drawEmoji(rocketChar, -25, -25, 50, player.isHit);
         ctx.restore();
         
         // Drones
@@ -1203,7 +1231,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const eAngle = Math.atan2(edy, edx) + Math.PI/2;
             ctx.rotate(eAngle);
 
-            drawEmoji(enemyEmojis[e.typeIdx], -25, -25, 50, e.isHit);
+            if (isNanoBananaLoaded) {
+                // 적들이 데미지를 입었을 때 밝아지게
+                if (e.isHit) ctx.filter = 'brightness(200%)';
+                drawEntityImage(nanoBananaImg, -25, -25, 50, e.isHit);
+                if (e.isHit) ctx.filter = 'none';
+            } else {
+                drawEmoji('🍌', -25, -25, 50, e.isHit);
+            }
+            
             ctx.restore();
         });
 
@@ -1220,9 +1256,17 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const isFinal = currentBoss.isFinal;
             const size = isFinal ? 250 : 120;
-            const bEmoji = isFinal ? '👹' : '👾';
             
-            drawEmoji(bEmoji, -size/2, -size/2, size, currentBoss.isHit);
+            if (isNanoBananaLoaded) {
+                if (isFinal) ctx.filter = 'hue-rotate(180deg)'; // 최종 보스는 빨간 바나나
+                if (currentBoss.isHit) ctx.filter = isFinal ? 'hue-rotate(180deg) brightness(200%)' : 'brightness(200%)';
+                drawEntityImage(nanoBananaImg, -size/2, -size/2, size, currentBoss.isHit);
+                ctx.filter = 'none';
+            } else {
+                const bEmoji = isFinal ? '👹' : '👾';
+                drawEmoji(bEmoji, -size/2, -size/2, size, currentBoss.isHit);
+            }
+            
             ctx.restore();
         }
 
