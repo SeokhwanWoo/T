@@ -94,11 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let rocketColor = localStorage.getItem('spaceRaidRocketColor') || 'blue'; // blue, red, green
     let rocketChar = localStorage.getItem('spaceRaidRocketChar') || '🚀';
     
-    // Progressive Image Loading
-    const nanoBananaImg = new Image();
-    nanoBananaImg.src = './assets/nano_banana.png';
-    let isNanoBananaLoaded = false;
-    nanoBananaImg.onload = () => { isNanoBananaLoaded = true; };
+    // 외부 이미지 없이 Canvas 도형으로 적을 렌더링합니다.
     
     let totalCredits = parseInt(localStorage.getItem('spaceRaidCredits')) || 0;
     let persistentUpgrades = JSON.parse(localStorage.getItem('spaceRaidUpgrades')) || { damage: 0, speed: 0, fireRate: 0 };
@@ -736,9 +732,18 @@ document.addEventListener('DOMContentLoaded', () => {
             y = Math.random() > 0.5 ? -50 : gameHeight + 50;
         }
 
-        // Random enemy asset index
+        // Random enemy type (0~4: UFO, 슬라임, 바이킹, 스파이더, 크리스탈)
         const typeIdx = Math.floor(Math.random() * 5);
-        enemies.push({ x, y, hp: 40 + (player.level * 10), maxHp: 40 + (player.level * 10), speed: 50 + Math.random() * 50, typeIdx, isHit: false, hitTimer: 0 });
+        const enemyTypes = [
+            { hp: 40,  speed: 60,  color: '#a855f7', shape: 'ufo'     }, // UFO - 보통
+            { hp: 60,  speed: 35,  color: '#22c55e', shape: 'slime'   }, // 슬라임 - 느리고 체력 많음
+            { hp: 50,  speed: 80,  color: '#f97316', shape: 'viking'  }, // 바이킹 - 빠름
+            { hp: 30,  speed: 100, color: '#ec4899', shape: 'spider'  }, // 스파이더 - 매우 빠름, 체력 낮음
+            { hp: 90,  speed: 25,  color: '#06b6d4', shape: 'crystal' }, // 크리스탈 - 매우 느리고 체력 많음
+        ];
+        const et = enemyTypes[typeIdx];
+        const baseHp = et.hp + (player.level * 8);
+        enemies.push({ x, y, hp: baseHp, maxHp: baseHp, speed: et.speed + Math.random() * 20, typeIdx, color: et.color, shape: et.shape, isHit: false, hitTimer: 0, angle: 0 });
     }
 
     function fireBossBulletHell() {
@@ -987,9 +992,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const bInfo = isFinal ? { name: '우주 포식자 (최종 보스)' } : { name: '외계 대마왕 (중간 보스)' };
         
         const x = gameWidth / 2; const y = -100;
-        const maxHp = 5000 + (level * 1000);
-        // dir 변수 추가 (이동 방향)
-        currentBoss = { x, y, hp: maxHp, maxHp: maxHp, speed: isFinal ? 150 : 300, dir: 1, isFinal, isHit: false, hitTimer: 0, lastShot: 0 };
+        // 체력 대폭 감소: 기존 5000+level*1000 → 2000+level*500
+        const maxHp = 2000 + (level * 500);
+        currentBoss = { x, y, hp: maxHp, maxHp: maxHp, speed: isFinal ? 150 : 300, dir: 1, isFinal, isHit: false, hitTimer: 0, lastShot: 0, angle: 0 };
         
         bossHpContainer.style.display = 'block';
         bossHpBar.style.width = '100%';
@@ -1191,6 +1196,241 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- 쫄병 적 Canvas 도형 렌더링 ---
+    function drawEnemyShape(ctx, e) {
+        const a = e.angle || 0;
+        const hit = e.isHit;
+        ctx.save();
+        if (hit) { ctx.shadowColor = '#fff'; ctx.shadowBlur = 15; }
+
+        switch (e.shape) {
+            case 'ufo': {
+                // UFO: 타원형 몸체 + 돔
+                ctx.rotate(a * 0.5);
+                // 몸체
+                ctx.beginPath();
+                ctx.ellipse(0, 4, 22, 10, 0, 0, Math.PI*2);
+                ctx.fillStyle = hit ? '#fff' : e.color;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                // 돔
+                ctx.beginPath();
+                ctx.ellipse(0, -2, 12, 9, 0, Math.PI, 0);
+                ctx.fillStyle = hit ? '#fff' : 'rgba(200,200,255,0.8)';
+                ctx.fill();
+                // 창문 불빛
+                if (!hit) {
+                    for (let i = -1; i <= 1; i++) {
+                        ctx.beginPath();
+                        ctx.arc(i * 8, 4, 3, 0, Math.PI*2);
+                        ctx.fillStyle = '#ffff00';
+                        ctx.fill();
+                    }
+                }
+                break;
+            }
+            case 'slime': {
+                // 슬라임: 동글동글한 물방울 모양
+                const wobble = Math.sin(a * 3) * 3;
+                ctx.beginPath();
+                ctx.ellipse(0, wobble/2, 20, 18 + wobble, 0, 0, Math.PI*2);
+                ctx.fillStyle = hit ? '#fff' : e.color;
+                ctx.fill();
+                // 눈
+                if (!hit) {
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath(); ctx.arc(-7, -3, 5, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(7, -3, 5, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath(); ctx.arc(-6, -3, 2.5, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(8, -3, 2.5, 0, Math.PI*2); ctx.fill();
+                }
+                break;
+            }
+            case 'viking': {
+                // 바이킹: 삼각형 + 뿔
+                ctx.rotate(Math.atan2(0, 1) + a * 0.3);
+                ctx.beginPath();
+                ctx.moveTo(0, -22);
+                ctx.lineTo(18, 15);
+                ctx.lineTo(-18, 15);
+                ctx.closePath();
+                ctx.fillStyle = hit ? '#fff' : e.color;
+                ctx.fill();
+                ctx.strokeStyle = '#fff8';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                // 뿔
+                if (!hit) {
+                    ctx.fillStyle = '#ffd700';
+                    ctx.beginPath(); ctx.moveTo(-18, 5); ctx.lineTo(-28, -10); ctx.lineTo(-13, -2); ctx.closePath(); ctx.fill();
+                    ctx.beginPath(); ctx.moveTo(18, 5); ctx.lineTo(28, -10); ctx.lineTo(13, -2); ctx.closePath(); ctx.fill();
+                }
+                break;
+            }
+            case 'spider': {
+                // 스파이더: 작은 원형 몸체 + 다리
+                ctx.rotate(a);
+                if (!hit) {
+                    ctx.strokeStyle = e.color;
+                    ctx.lineWidth = 2;
+                    for (let i = 0; i < 8; i++) {
+                        const legAngle = (Math.PI * 2 / 8) * i;
+                        const wave = Math.sin(a * 4 + i) * 4;
+                        ctx.beginPath();
+                        ctx.moveTo(Math.cos(legAngle)*10, Math.sin(legAngle)*10);
+                        ctx.lineTo(Math.cos(legAngle)*(22+wave), Math.sin(legAngle)*(22+wave));
+                        ctx.stroke();
+                    }
+                }
+                ctx.beginPath();
+                ctx.arc(0, 0, 12, 0, Math.PI*2);
+                ctx.fillStyle = hit ? '#fff' : e.color;
+                ctx.fill();
+                if (!hit) {
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath(); ctx.arc(-4, -2, 3, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(4, -2, 3, 0, Math.PI*2); ctx.fill();
+                }
+                break;
+            }
+            case 'crystal': {
+                // 크리스탈: 다각형 + 반짝임
+                ctx.rotate(a * 0.2);
+                const pts = 6;
+                ctx.beginPath();
+                for (let i = 0; i < pts; i++) {
+                    const ang = (Math.PI * 2 / pts) * i - Math.PI/2;
+                    const r = i % 2 === 0 ? 24 : 14;
+                    if (i === 0) ctx.moveTo(Math.cos(ang)*r, Math.sin(ang)*r);
+                    else ctx.lineTo(Math.cos(ang)*r, Math.sin(ang)*r);
+                }
+                ctx.closePath();
+                ctx.fillStyle = hit ? '#fff' : e.color;
+                ctx.fill();
+                if (!hit) {
+                    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    // 내부 빛
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 8, 0, Math.PI*2);
+                    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                    ctx.fill();
+                }
+                break;
+            }
+        }
+        ctx.restore();
+    }
+
+    // --- 보스 Canvas 도형 렌더링 ---
+    function drawBossShape(ctx, boss) {
+        const a = boss.angle || 0;
+        const hit = boss.isHit;
+        ctx.save();
+        if (hit) { ctx.shadowColor = '#fff'; ctx.shadowBlur = 30; }
+
+        if (boss.isFinal) {
+            // 최종 보스: 거대한 해골 모양 + 붉은 오라
+            const s = 70;
+            ctx.rotate(a * 0.1);
+            // 오라
+            if (!hit) {
+                const grad = ctx.createRadialGradient(0, 0, 30, 0, 0, s + 20);
+                grad.addColorStop(0, 'rgba(255,0,50,0.3)');
+                grad.addColorStop(1, 'rgba(255,0,50,0)');
+                ctx.beginPath(); ctx.arc(0, 0, s + 20, 0, Math.PI*2);
+                ctx.fillStyle = grad; ctx.fill();
+            }
+            // 몸통 (원형)
+            ctx.beginPath();
+            ctx.arc(0, 0, s, 0, Math.PI*2);
+            ctx.fillStyle = hit ? '#fff' : '#cc1100';
+            ctx.fill();
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            if (!hit) {
+                // 눈
+                ctx.fillStyle = '#ff0';
+                [[-25,-15],[25,-15]].forEach(([ex,ey]) => {
+                    ctx.beginPath(); ctx.ellipse(ex, ey, 14, 18, 0, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath(); ctx.arc(ex, ey+2, 8, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#ff0';
+                });
+                // 이빨
+                ctx.fillStyle = '#fff';
+                for (let t = -3; t <= 3; t++) {
+                    ctx.beginPath();
+                    ctx.moveTo(t*14-7, 28);
+                    ctx.lineTo(t*14, 50);
+                    ctx.lineTo(t*14+7, 28);
+                    ctx.closePath(); ctx.fill();
+                }
+                // 회전하는 외곽 링
+                ctx.save(); ctx.rotate(a);
+                ctx.beginPath(); ctx.arc(0, 0, s+8, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(255,80,0,0.5)'; ctx.lineWidth = 8;
+                ctx.setLineDash([20,20]); ctx.stroke(); ctx.setLineDash([]);
+                ctx.restore();
+            }
+        } else {
+            // 중간 보스: 외계인 로봇 모양
+            const s = 45;
+            ctx.rotate(a * 0.15);
+            // 오라
+            if (!hit) {
+                const grad2 = ctx.createRadialGradient(0, 0, 20, 0, 0, s + 15);
+                grad2.addColorStop(0, 'rgba(100,0,255,0.25)');
+                grad2.addColorStop(1, 'rgba(100,0,255,0)');
+                ctx.beginPath(); ctx.arc(0, 0, s + 15, 0, Math.PI*2);
+                ctx.fillStyle = grad2; ctx.fill();
+            }
+            // 몸통 (roundRect 폴리필 대응)
+            ctx.beginPath();
+            const rr = 15;
+            ctx.moveTo(-s + rr, -s);
+            ctx.lineTo(s - rr, -s); ctx.arcTo(s, -s, s, -s+rr, rr);
+            ctx.lineTo(s, s - rr); ctx.arcTo(s, s, s-rr, s, rr);
+            ctx.lineTo(-s + rr, s); ctx.arcTo(-s, s, -s, s-rr, rr);
+            ctx.lineTo(-s, -s + rr); ctx.arcTo(-s, -s, -s+rr, -s, rr);
+            ctx.closePath();
+            ctx.fillStyle = hit ? '#fff' : '#6600cc';
+            ctx.fill();
+            ctx.strokeStyle = '#aa44ff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            if (!hit) {
+                // 눈 (3개)
+                [[-18,0],[0,-12],[18,0]].forEach(([ex,ey]) => {
+                    ctx.beginPath(); ctx.arc(ex, ey, 10, 0, Math.PI*2);
+                    ctx.fillStyle = '#ff0'; ctx.fill();
+                    ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI*2);
+                    ctx.fillStyle = '#000'; ctx.fill();
+                });
+                // 안테나
+                ctx.strokeStyle = '#aa44ff'; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.moveTo(-20,-s); ctx.lineTo(-25,-s-20); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(20,-s); ctx.lineTo(25,-s-20); ctx.stroke();
+                ctx.beginPath(); ctx.arc(-25,-s-20,5,0,Math.PI*2);
+                ctx.fillStyle = '#ff0'; ctx.fill();
+                ctx.beginPath(); ctx.arc(25,-s-20,5,0,Math.PI*2);
+                ctx.fillStyle = '#ff0'; ctx.fill();
+                // 회전 링
+                ctx.save(); ctx.rotate(-a * 2);
+                ctx.beginPath(); ctx.arc(0, 0, s+7, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(170,68,255,0.6)'; ctx.lineWidth = 5;
+                ctx.setLineDash([15,10]); ctx.stroke(); ctx.setLineDash([]);
+                ctx.restore();
+            }
+        }
+        ctx.restore();
+    }
+
     function render() {
         // Player
         ctx.save();
@@ -1219,54 +1459,21 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.restore();
         });
 
-        // Enemies
-        const enemyEmojis = ['🛸', '👾', '👽', '💀', '☄️'];
+        // Enemies - Canvas 도형으로 렌더링 (이미지 없이)
         enemies.forEach(e => {
+            e.angle = (e.angle || 0) + 0.02;
             ctx.save();
             ctx.translate(e.x, e.y);
-            
-            // rotate towards player
-            const edx = player.x - e.x;
-            const edy = player.y - e.y;
-            const eAngle = Math.atan2(edy, edx) + Math.PI/2;
-            ctx.rotate(eAngle);
-
-            if (isNanoBananaLoaded) {
-                // 적들이 데미지를 입었을 때 밝아지게
-                if (e.isHit) ctx.filter = 'brightness(200%)';
-                drawEntityImage(nanoBananaImg, -25, -25, 50, e.isHit);
-                if (e.isHit) ctx.filter = 'none';
-            } else {
-                drawEmoji('🍌', -25, -25, 50, e.isHit);
-            }
-            
+            drawEnemyShape(ctx, e);
             ctx.restore();
         });
 
-        // Boss
+        // Boss - Canvas 도형으로 렌더링
         if (bossActive && currentBoss) {
+            currentBoss.angle = (currentBoss.angle || 0) + 0.015;
             ctx.save();
             ctx.translate(currentBoss.x, currentBoss.y);
-            
-            // rotate boss towards player
-            const bdx = player.x - currentBoss.x;
-            const bdy = player.y - currentBoss.y;
-            const bAngle = Math.atan2(bdy, bdx) + Math.PI/2;
-            ctx.rotate(bAngle);
-            
-            const isFinal = currentBoss.isFinal;
-            const size = isFinal ? 250 : 120;
-            
-            if (isNanoBananaLoaded) {
-                if (isFinal) ctx.filter = 'hue-rotate(180deg)'; // 최종 보스는 빨간 바나나
-                if (currentBoss.isHit) ctx.filter = isFinal ? 'hue-rotate(180deg) brightness(200%)' : 'brightness(200%)';
-                drawEntityImage(nanoBananaImg, -size/2, -size/2, size, currentBoss.isHit);
-                ctx.filter = 'none';
-            } else {
-                const bEmoji = isFinal ? '👹' : '👾';
-                drawEmoji(bEmoji, -size/2, -size/2, size, currentBoss.isHit);
-            }
-            
+            drawBossShape(ctx, currentBoss);
             ctx.restore();
         }
 
